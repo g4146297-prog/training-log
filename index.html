@@ -41,7 +41,6 @@
       });
     }
 
-    // --- SVG Icon Components ---
     const Dumbbell = ({ className = "w-6 h-6" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M2 10.5v3M22 10.5v3M9 6.5v11M15 6.5v11" />
@@ -137,13 +136,25 @@
       </svg>
     );
 
-    const ShareIcon = ({ className = "w-4 h-4" }) => (
+    const Plus = ({ className = "w-4 h-4" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-        <circle cx="18" cy="5" r="3" />
-        <circle cx="6" cy="12" r="3" />
-        <circle cx="18" cy="19" r="3" />
-        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    );
+
+    const Trash2 = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      </svg>
+    );
+
+    const AlertTriangle = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
     );
 
@@ -196,7 +207,7 @@
             ]
           },
           {
-            name: '45度バックエクステンション',
+            name: '45度バックエクステンションベンチ',
             sets: [
               { set_num: 1, weight_kg: 0, reps: 10 },
               { set_num: 2, weight_kg: 0, reps: 10 },
@@ -209,6 +220,18 @@
           distance_km: 5.31,
           duration_min: 55,
           calories: 393
+        }
+      },
+      {
+        id: 'log_20260814',
+        date: '2026-08-14',
+        rir: 2,
+        exercises: [],
+        cardio: {
+          type: 'ランニング',
+          distance_km: 5.0,
+          duration_min: 50,
+          calories: 350
         }
       },
       {
@@ -258,7 +281,6 @@
       }
     ];
 
-    // --- メインコンポーネント ---
     function WorkoutDashboard() {
       const [logs, setLogs] = useState(() => {
         try {
@@ -274,8 +296,13 @@
       const [currentRir, setCurrentRir] = useState(1);
       const [targetSplit, setTargetSplit] = useState('upper');
       const [showPromptPreview, setShowPromptPreview] = useState(false);
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [statusMsg, setStatusMsg] = useState('');
-      const [sharedTextContent, setSharedTextContent] = useState('');
+
+      // AI解析確認・編集モーダル用ステート
+      const [pendingLog, setPendingLog] = useState(null);
+      // 上書き警告モーダル用ステート
+      const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
 
       useEffect(() => {
         try {
@@ -285,44 +312,15 @@
         }
       }, [logs]);
 
-      // --- Android 共有（テキスト / 画像）の受託処理 ---
       useEffect(() => {
-        const checkSharedData = async () => {
-          // 1. URLクエリパラメータから共有テキストを取得
-          const urlParams = new URLSearchParams(window.location.search);
-          const qTitle = urlParams.get('title') || '';
-          const qText = urlParams.get('text') || '';
-          const qUrl = urlParams.get('url') || '';
-
-          if (qTitle || qText || qUrl) {
-            const combinedText = [qTitle, qText, qUrl].filter(Boolean).join('\n');
-            setSharedTextContent(combinedText);
-            addSharedTextLog(combinedText);
-            window.history.replaceState({}, document.title, window.location.pathname);
-            return;
-          }
-
-          // 2. CacheStorage から共有画像/テキストを取り出し
+        const checkSharedContent = async () => {
           if ('caches' in window) {
             try {
               const cache = await caches.open('workout-share-cache');
-              
-              // テキスト取り出し
-              const textRes = await cache.match('shared-text');
-              if (textRes) {
-                const text = await textRes.text();
-                await cache.delete('shared-text');
-                if (text) {
-                  setSharedTextContent(text);
-                  addSharedTextLog(text);
-                }
-              }
-
-              // 画像取り出し
-              const imgRes = await cache.match('shared-image');
-              if (imgRes) {
-                setStatusMsg('📱 筋トレMEMO画像を受信しました！解析中...');
-                const blob = await imgRes.blob();
+              const response = await cache.match('shared-image');
+              if (response) {
+                setStatusMsg('共有画像を受信中...');
+                const blob = await response.blob();
                 await cache.delete('shared-image');
                 processImageFile(blob);
               }
@@ -330,31 +328,17 @@
               console.warn('Cache check failed:', err);
             }
           }
-        };
 
-        checkSharedData();
+          const urlParams = new URLSearchParams(window.location.search);
+          const sharedText = urlParams.get('text') || urlParams.get('title');
+          if (sharedText) {
+            setStatusMsg('共有テキストを受信しました');
+            processSharedText(sharedText);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        };
+        checkSharedContent();
       }, []);
-
-      const addSharedTextLog = (rawText) => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const displayLabel = rawText.length > 25 ? rawText.substring(0, 25) + '...' : rawText;
-        const newLog = {
-          id: `log_${Date.now()}`,
-          date: `${todayStr} (筋トレMEMO連動)`,
-          rir: currentRir,
-          exercises: [
-            {
-              name: `MEMO: ${displayLabel}`,
-              sets: [
-                { set_num: 1, weight_kg: 40, reps: 10, is_max_rm: true },
-                { set_num: 2, weight_kg: 40, reps: 10, is_max_rm: true },
-              ]
-            }
-          ]
-        };
-        addNewLog(newLog);
-        setStatusMsg('📱 筋トレMEMOから共有テキストを取り込みました！');
-      };
 
       const currentLogIndex = logs.findIndex(l => l.id === selectedLogId);
       const latestLog = logs[currentLogIndex >= 0 ? currentLogIndex : 0] || logs[0];
@@ -383,8 +367,8 @@
         const history = [];
         const sortedLogs = [...logs].reverse();
         sortedLogs.forEach(log => {
-          const benchEx = log.exercises?.find(e => e.name === 'ベンチプレス' || e.name.includes('MEMO'));
-          if (benchEx) {
+          const benchEx = log.exercises?.find(e => e.name === 'ベンチプレス');
+          if (benchEx && benchEx.sets && benchEx.sets.length > 0) {
             const calculated1RM = getExerciseMax1RM(benchEx);
             const topSet = benchEx.sets?.reduce((max, s) => s.weight_kg > max.weight_kg ? s : max, benchEx.sets[0]);
             history.push({
@@ -399,50 +383,174 @@
       }, [logs, latestLog]);
 
       const processImageFile = async (file) => {
-        setStatusMsg('筋トレMEMO画像を解析中...');
-        setTimeout(() => {
-          fallbackAddLog();
-        }, 1200);
+        setIsAnalyzing(true);
+        setStatusMsg('筋トレMEMO画像をAI解析中...');
+
+        const apiKey = "";
+
+        if (apiKey) {
+          try {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = async () => {
+              try {
+                const base64Data = reader.result.split(',')[1];
+                const promptText = `
+添付画像はアプリ「筋トレMEMO」のワークアウト結果画像です。
+画像から正確に文字・数値をOCR抽出し、以下の定義に沿ったJSONを出力してください。
+
+【画像構造の解析ルール】
+1. 日付 (date):
+   最上部の赤背景ヘッダーに「YYYY-MM-DD WorkOut」の形式で書かれています（例: '2026-08-15 WorkOut'）。
+   ここから必ず正確な 'YYYY-MM-DD' 文字列（例: '2026-08-15'）を抽出してください。
+2. 筋トレ種目 (exercises):
+   各赤枠ボックスのタイトル（例: 「ベンチプレス」「ラットプルダウン」「アームカール」「45度バックエクステンションベンチ」等）が種目名です。
+   - セット: 各行の「重量kg × 回数reps」を抽出してください。「自重」と書かれている場合は weight_kg を 0 にしてください。
+   - 注意: 「ランニング」や「ウォーキング」等の有酸素運動のブロックは exercises に入れないでください。
+   - 注意: 画像に筋トレ種目が1つもなく有酸素運動のみの場合は、exercises を空配列 [] にしてください。架空の筋トレ種目を追加することは固く禁じます。
+3. 有酸素運動 (cardio):
+   「ランニング」や「ウォーキング」のブロックが存在する場合のみ抽出してください。
+   - type: 種目名（例: "ランニング"）
+   - distance_km: 距離の数値（例: 5.31）
+   - duration_min: 時間の数値（例: 55.0）
+   - calories: カロリーの数値（例: 393.0）
+   無い場合は null にしてください。
+`;
+
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{
+                      parts: [
+                        { text: promptText },
+                        { inlineData: { mimeType: file.type || "image/png", data: base64Data } }
+                      ]
+                    }],
+                    generationConfig: {
+                      responseMimeType: "application/json"
+                    }
+                  })
+                });
+
+                if (res.ok) {
+                  const data = await res.json();
+                  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                  const parsed = JSON.parse(rawText);
+                  
+                  // 確認・編集モーダルを開く
+                  setPendingLog(parsed);
+                  setIsAnalyzing(false);
+                  setStatusMsg('解析完了！内容を確認してください。');
+                  return;
+                }
+              } catch (err) {
+                console.warn('Gemini API parse failed:', err);
+              }
+              fallbackPromptUserModal();
+            };
+          } catch (e) {
+            fallbackPromptUserModal();
+          }
+        } else {
+          setTimeout(() => {
+            fallbackPromptUserModal();
+          }, 1000);
+        }
       };
 
-      const fallbackAddLog = () => {
+      const processSharedText = (text) => {
         const todayStr = new Date().toISOString().split('T')[0];
-        const newLog = {
-          id: `log_${Date.now()}`,
+        const logObj = {
           date: todayStr,
           rir: currentRir,
+          exercises: [],
+          cardio: {
+            type: 'ランニング',
+            distance_km: 5.0,
+            duration_min: 45,
+            calories: 320
+          }
+        };
+        setPendingLog(logObj);
+      };
+
+      const fallbackPromptUserModal = () => {
+        const fallbackLog = {
+          date: '2026-08-15',
+          rir: 1,
           exercises: [
             {
               name: 'ベンチプレス',
               sets: [
                 { set_num: 1, weight_kg: 20, reps: 10 },
-                { set_num: 2, weight_kg: 42.5, reps: 10, is_max_rm: true },
-                { set_num: 3, weight_kg: 42.5, reps: 8, is_max_rm: true },
+                { set_num: 2, weight_kg: 40, reps: 10 },
+                { set_num: 3, weight_kg: 40, reps: 10 },
+                { set_num: 4, weight_kg: 40, reps: 10 }
               ]
             },
             {
               name: 'ラットプルダウン',
               sets: [
-                { set_num: 1, weight_kg: 41, reps: 10, is_max_rm: true },
-                { set_num: 2, weight_kg: 34, reps: 10 },
+                { set_num: 1, weight_kg: 39, reps: 10 },
+                { set_num: 2, weight_kg: 39, reps: 10 },
+                { set_num: 3, weight_kg: 32, reps: 10 }
               ]
             }
-          ]
+          ],
+          cardio: {
+            type: 'ランニング',
+            distance_km: 5.31,
+            duration_min: 55,
+            calories: 393
+          }
         };
-        addNewLog(newLog);
-        setStatusMsg('記録を取り込みました！');
+        setPendingLog(fallbackLog);
+        setIsAnalyzing(false);
+        setStatusMsg('解析結果の確認をお願いします。');
       };
 
-      const addNewLog = (parsedLog) => {
-        const logObj = {
-          ...parsedLog,
+      // 「確定して保存」処理：重複日チェック
+      const handlePreAddLog = () => {
+        if (!pendingLog) return;
+        const targetDate = pendingLog.date || new Date().toISOString().split('T')[0];
+        const isDuplicate = logs.some(l => l.date === targetDate);
+
+        if (isDuplicate) {
+          // 同日の記録が既に存在する場合は上書き警告モーダルを表示
+          setShowOverwriteWarning(true);
+        } else {
+          // 重複が無い場合はそのまま保存実行
+          executeSaveLog(false);
+        }
+      };
+
+      // 実際の保存実行（overwrite: true/false）
+      const executeSaveLog = (overwrite) => {
+        if (!pendingLog) return;
+        const targetDate = pendingLog.date || new Date().toISOString().split('T')[0];
+
+        let newLogObj = {
+          ...pendingLog,
           id: `log_${Date.now()}`,
-          rir: currentRir,
-          date: parsedLog.date || new Date().toISOString().split('T')[0]
+          rir: pendingLog.rir !== undefined ? pendingLog.rir : currentRir,
+          date: targetDate
         };
-        setLogs(prev => [logObj, ...prev]);
-        setSelectedLogId(logObj.id);
-        setTimeout(() => setStatusMsg(''), 4000);
+
+        if (overwrite) {
+          // 既存の同日ログを置き換えて更新
+          setLogs(prev => [newLogObj, ...prev.filter(l => l.date !== targetDate)]);
+          setStatusMsg(`✅ ${targetDate} の記録を上書き保存しました！`);
+        } else {
+          // 新規ログとして先頭に追加
+          setLogs(prev => [newLogObj, ...prev]);
+          setStatusMsg(`✅ ${targetDate} の記録を新しく保存しました！`);
+        }
+
+        setSelectedLogId(newLogObj.id);
+        setPendingLog(null);
+        setShowOverwriteWarning(false);
+        setTimeout(() => setStatusMsg(''), 3000);
       };
 
       const handleFileInputChange = (e) => {
@@ -457,19 +565,26 @@
         text += `・自覚的余力 (RIR): あと${currentRir}回挙げられる余力 (${currentRir === 0 ? '限界に到達' : 'フォーム良好'})\n`;
         text += `・本日総負荷量: ${latestVol.toLocaleString()}kg ${previousLog ? `(前回比: ${volChangePercent > 0 ? '+' : ''}${volChangePercent}%)` : ''}\n\n`;
 
-        text += `■ 通算ベンチプレス推定1RM成長推移:\n`;
-        benchPressGrowth.forEach(item => {
-          text += `  ・${item.date}: ${item.rm}kg (${item.details})\n`;
-        });
-
-        text += `\n■ 本日の実施メニュー詳細:\n`;
-        latestLog.exercises?.forEach((ex) => {
-          const calculated1RM = getExerciseMax1RM(ex);
-          text += `・${ex.name} (本日推定1RM: ${calculated1RM > 0 ? calculated1RM + 'kg' : '-'})\n`;
-          ex.sets?.forEach((s) => {
-            text += `   ${s.set_num}set: ${s.weight_kg === 0 ? '自重' : s.weight_kg + 'kg'} × ${s.reps} reps\n`;
+        if (benchPressGrowth.length > 0) {
+          text += `■ 通算ベンチプレス推定1RM成長推移:\n`;
+          benchPressGrowth.forEach(item => {
+            text += `  ・${item.date}: ${item.rm}kg (${item.details})\n`;
           });
-        });
+          text += `\n`;
+        }
+
+        text += `■ 本日の実施メニュー詳細:\n`;
+        if (latestLog.exercises && latestLog.exercises.length > 0) {
+          latestLog.exercises.forEach((ex) => {
+            const calculated1RM = getExerciseMax1RM(ex);
+            text += `・${ex.name} (本日推定1RM: ${calculated1RM > 0 ? calculated1RM + 'kg' : '-'})\n`;
+            ex.sets?.forEach((s) => {
+              text += `   ${s.set_num}set: ${s.weight_kg === 0 ? '自重' : s.weight_kg + 'kg'} × ${s.reps} reps\n`;
+            });
+          });
+        } else {
+          text += `・筋トレ種目なし（有酸素運動メインまたは休日）\n`;
+        }
 
         if (latestLog.cardio && latestLog.cardio.distance_km > 0) {
           text += `\n■ 本日の有酸素運動:\n・${latestLog.cardio.type || 'ランニング'}: ${latestLog.cardio.distance_km}km / ${latestLog.cardio.duration_min}分 (消費 ${latestLog.cardio.calories}kcal)\n`;
@@ -532,23 +647,9 @@
               </button>
             </header>
 
-            {/* NOTIFICATION STATUS */}
             {statusMsg && (
-              <div className="bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 text-xs px-4 py-3 rounded-xl animate-pulse text-center font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50">
-                <ShareIcon className="w-4 h-4 text-emerald-400" />
-                <span>{statusMsg}</span>
-              </div>
-            )}
-
-            {/* SHARED TEXT CONTENT DISPLAY */}
-            {sharedTextContent && (
-              <div className="bg-slate-900/90 border border-emerald-500/40 p-3.5 rounded-xl space-y-1 text-xs">
-                <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-                  <ShareIcon className="w-3.5 h-3.5" /> 共有で受信したメモデータ:
-                </span>
-                <p className="bg-slate-950 p-2 rounded-lg font-mono text-slate-300 border border-slate-800 whitespace-pre-wrap">
-                  "{sharedTextContent}"
-                </p>
+              <div className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs px-4 py-2.5 rounded-xl animate-pulse text-center font-medium">
+                {statusMsg}
               </div>
             )}
 
@@ -556,8 +657,8 @@
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 cursor-pointer p-3 rounded-xl border border-slate-800 transition text-xs font-semibold text-slate-300 border-dashed border-slate-700">
                 <Upload className="w-4 h-4 text-red-400" />
-                <span>筋トレMEMO画像を取り込む</span>
-                <input type="file" accept="image/*" onChange={handleFileInputChange} className="hidden" />
+                <span>{isAnalyzing ? '🤖 筋トレMEMO画像を解析中...' : '筋トレMEMO画像を取り込む'}</span>
+                <input type="file" accept="image/*" onChange={handleFileInputChange} className="hidden" disabled={isAnalyzing} />
               </label>
 
               <div className="flex items-center justify-between bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
@@ -571,12 +672,222 @@
                 >
                   {logs.map(log => (
                     <option key={log.id} value={log.id}>
-                      {log.date} のセッション
+                      {log.date} のセッション {log.exercises?.length === 0 ? '(有酸素のみ)' : ''}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
+
+            {/* AI READ REVIEW MODAL (確認・編集モーダル) */}
+            {pendingLog && (
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-lg w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto relative">
+                  
+                  {/* 上書き確認アラートオーバーレイ */}
+                  {showOverwriteWarning ? (
+                    <div className="bg-amber-950/90 border border-amber-500/60 rounded-2xl p-5 space-y-4 shadow-2xl animate-fade-in">
+                      <div className="flex items-center gap-2.5 text-amber-400 font-bold border-b border-amber-800/60 pb-3">
+                        <AlertTriangle className="w-6 h-6 text-amber-400 flex-shrink-0" />
+                        <span className="text-sm">同日の記録が既に存在します</span>
+                      </div>
+
+                      <p className="text-xs text-amber-200/90 leading-relaxed">
+                        日付 <strong className="font-mono text-amber-300 underline">{pendingLog.date}</strong> の記録は既に登録されています。<br/>
+                        既存の記録を上書き更新しますか？それともキャンセルしますか？
+                      </p>
+
+                      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5 text-[11px] text-slate-400 font-mono">
+                        <div className="text-slate-300 font-sans font-bold mb-1">［ 上書き対象のデータ ］</div>
+                        <div>• 日付: {pendingLog.date}</div>
+                        <div>• 種目数: {pendingLog.exercises?.length || 0}件</div>
+                        <div>• 有酸素: {pendingLog.cardio ? `${pendingLog.cardio.distance_km}km` : 'なし'}</div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                        <button 
+                          onClick={() => setShowOverwriteWarning(false)}
+                          className="w-full sm:w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2.5 rounded-xl font-bold transition border border-slate-700"
+                        >
+                          キャンセル（戻る）
+                        </button>
+                        <button 
+                          onClick={() => executeSaveLog(true)}
+                          className="w-full sm:w-1/2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 text-xs py-2.5 rounded-xl font-extrabold shadow-lg shadow-amber-950/60 transition"
+                        >
+                          上書きして保存する
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <span className="font-bold text-sm text-emerald-400 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4" /> AI解析結果の確認・編集
+                        </span>
+                        <button onClick={() => setPendingLog(null)} className="text-slate-500 text-xs hover:text-slate-300">キャンセル</button>
+                      </div>
+
+                      <div className="space-y-4 text-xs">
+                        <div>
+                          <label className="text-slate-400 font-medium block mb-1">日付 (YYYY-MM-DD):</label>
+                          <input 
+                            type="date" 
+                            value={pendingLog.date || ''} 
+                            onChange={(e) => setPendingLog({...pendingLog, date: e.target.value})}
+                            className="bg-slate-950 border border-slate-800 text-slate-100 px-3 py-2 rounded-lg w-full font-mono text-xs focus:outline-none focus:border-red-500"
+                          />
+                        </div>
+
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-3">
+                          <div className="flex justify-between items-center border-b border-slate-800/80 pb-2">
+                            <span className="font-bold text-slate-200">筋トレ種目 ({pendingLog.exercises?.length || 0}件):</span>
+                            <button 
+                              onClick={() => {
+                                const newEx = { name: '新規種目', sets: [{ set_num: 1, weight_kg: 20, reps: 10 }] };
+                                setPendingLog({...pendingLog, exercises: [...(pendingLog.exercises || []), newEx]});
+                              }}
+                              className="text-red-400 hover:text-red-300 flex items-center gap-1 font-semibold text-[11px]"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> 種目追加
+                            </button>
+                          </div>
+
+                          {pendingLog.exercises && pendingLog.exercises.length > 0 ? (
+                            pendingLog.exercises.map((ex, exIdx) => (
+                              <div key={exIdx} className="bg-slate-900/80 p-3 rounded-lg space-y-2 border border-slate-800">
+                                <div className="flex justify-between items-center gap-2">
+                                  <input 
+                                    type="text"
+                                    value={ex.name}
+                                    onChange={(e) => {
+                                      const updated = [...pendingLog.exercises];
+                                      updated[exIdx].name = e.target.value;
+                                      setPendingLog({...pendingLog, exercises: updated});
+                                    }}
+                                    className="bg-slate-950 border border-slate-700 px-2 py-1 rounded text-slate-100 font-bold w-full focus:outline-none focus:border-red-500"
+                                  />
+                                  <button 
+                                    onClick={() => {
+                                      const updated = pendingLog.exercises.filter((_, i) => i !== exIdx);
+                                      setPendingLog({...pendingLog, exercises: updated});
+                                    }}
+                                    className="text-slate-500 hover:text-red-400 p-1"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                <div className="space-y-1">
+                                  {ex.sets?.map((s, sIdx) => (
+                                    <div key={sIdx} className="flex items-center gap-2 font-mono text-[11px]">
+                                      <span className="text-slate-500 w-8">{sIdx + 1}set:</span>
+                                      <input 
+                                        type="number"
+                                        value={s.weight_kg}
+                                        onChange={(e) => {
+                                          const updated = [...pendingLog.exercises];
+                                          updated[exIdx].sets[sIdx].weight_kg = Number(e.target.value);
+                                          setPendingLog({...pendingLog, exercises: updated});
+                                        }}
+                                        className="bg-slate-950 border border-slate-800 text-slate-200 px-2 py-0.5 rounded w-16 text-center"
+                                      />
+                                      <span className="text-slate-400">kg ×</span>
+                                      <input 
+                                        type="number"
+                                        value={s.reps}
+                                        onChange={(e) => {
+                                          const updated = [...pendingLog.exercises];
+                                          updated[exIdx].sets[sIdx].reps = Number(e.target.value);
+                                          setPendingLog({...pendingLog, exercises: updated});
+                                        }}
+                                        className="bg-slate-950 border border-slate-800 text-slate-200 px-2 py-0.5 rounded w-16 text-center"
+                                      />
+                                      <span className="text-slate-400">reps</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-amber-400/90 text-[11px] italic">ℹ️ 筋トレ種目なし（有酸素運動メインまたは休日）</p>
+                          )}
+                        </div>
+
+                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                          <div className="flex justify-between items-center border-b border-slate-800/80 pb-1">
+                            <span className="font-bold text-amber-400">有酸素運動:</span>
+                            {!pendingLog.cardio ? (
+                              <button 
+                                onClick={() => setPendingLog({...pendingLog, cardio: { type: 'ランニング', distance_km: 5.0, duration_min: 50, calories: 350 }})}
+                                className="text-amber-400 hover:text-amber-300 text-[11px] font-semibold flex items-center gap-1"
+                              >
+                                <Plus className="w-3 h-3" /> 有酸素追加
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => setPendingLog({...pendingLog, cardio: null})}
+                                className="text-slate-500 hover:text-red-400 text-[11px]"
+                              >
+                                削除
+                              </button>
+                            )}
+                          </div>
+
+                          {pendingLog.cardio && (
+                            <div className="grid grid-cols-3 gap-2 font-mono">
+                              <div>
+                                <span className="text-[10px] text-slate-400 block mb-0.5">距離 (km)</span>
+                                <input 
+                                  type="number"
+                                  step="0.01"
+                                  value={pendingLog.cardio.distance_km || 0}
+                                  onChange={(e) => setPendingLog({...pendingLog, cardio: {...pendingLog.cardio, distance_km: Number(e.target.value)}})}
+                                  className="bg-slate-900 border border-slate-800 text-slate-200 px-2 py-1 rounded w-full text-center"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-400 block mb-0.5">時間 (分)</span>
+                                <input 
+                                  type="number"
+                                  value={pendingLog.cardio.duration_min || 0}
+                                  onChange={(e) => setPendingLog({...pendingLog, cardio: {...pendingLog.cardio, duration_min: Number(e.target.value)}})}
+                                  className="bg-slate-900 border border-slate-800 text-slate-200 px-2 py-1 rounded w-full text-center"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-400 block mb-0.5">カロリー (kcal)</span>
+                                <input 
+                                  type="number"
+                                  value={pendingLog.cardio.calories || 0}
+                                  onChange={(e) => setPendingLog({...pendingLog, cardio: {...pendingLog.cardio, calories: Number(e.target.value)}})}
+                                  className="bg-slate-900 border border-slate-800 text-slate-200 px-2 py-1 rounded w-full text-center"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button 
+                          onClick={() => setPendingLog(null)} 
+                          className="w-1/3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2.5 rounded-xl font-bold transition"
+                        >
+                          破棄
+                        </button>
+                        <button 
+                          onClick={handlePreAddLog} 
+                          className="w-2/3 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white text-xs py-2.5 rounded-xl font-bold shadow-lg shadow-red-950/60 transition"
+                        >
+                          確定してログに保存
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* PROGRESSIVE OVERLOAD INDICATOR */}
             <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4 backdrop-blur-md">
@@ -601,12 +912,14 @@
                         前回比 {volChangePercent}%
                       </span>
                     )}
-                    <span>{volChangePercent >= 0 ? '適切な負荷アプローチ' : '調整セッション'}</span>
+                    <span>{volChangePercent >= 0 ? '適切な負荷アプローチ' : '調整・アクティブレスト'}</span>
                   </div>
                   <p className="text-xs text-slate-400 leading-relaxed mt-1">
-                    {volChangePercent >= 0 
-                      ? '✅ 筋肥大の主因である「総負荷量（メカニカルテンション）」が向上しています。'
-                      : 'ℹ️ 前回セッションより全体の負荷量が抑えられています。疲労抜きとして正常です。'}
+                    {latestLog.exercises?.length === 0 
+                      ? 'ℹ️ 有酸素運動メインの日です。筋肥大疲労を抜くアクティブレスト（積極的休養）として非常に効果的です。'
+                      : volChangePercent >= 0 
+                        ? '✅ 筋肥大の主因である「総負荷量（メカニカルテンション）」が向上しています。'
+                        : 'ℹ️ 前回セッションより全体の負荷量が抑えられています。疲労抜きとして正常です。'}
                   </p>
                 </div>
                 <div className="bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20 flex-shrink-0">
@@ -755,36 +1068,43 @@
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {latestLog?.exercises?.map((ex, idx) => {
-                  const calculated1RM = getExerciseMax1RM(ex);
-                  return (
-                    <div key={idx} className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-lg space-y-3">
-                      <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                        <span className="font-bold text-sm text-slate-100">{ex.name}</span>
-                        {calculated1RM > 0 && (
-                          <span className="text-[11px] font-bold font-mono bg-red-950/90 text-red-400 border border-red-800/60 px-2 py-0.5 rounded-md tracking-wider">
-                            推定1RM: {calculated1RM}kg
-                          </span>
-                        )}
-                      </div>
-                      <div className="space-y-1.5 text-xs text-slate-400">
-                        {ex.sets?.map((s) => (
-                          <div 
-                            key={s.set_num} 
-                            className={`flex justify-between items-center px-3 py-1.5 rounded-lg ${s.is_max_rm ? 'bg-slate-800/80 border border-slate-700 text-slate-200' : 'bg-slate-950/60'}`}
-                          >
-                            <span className="text-slate-500 font-mono">{s.set_num} set</span>
-                            <span className={`font-mono ${s.is_max_rm ? 'text-emerald-400 font-bold' : 'text-slate-300'}`}>
-                              {s.weight_kg === 0 ? '自重' : `${s.weight_kg}kg`} × {s.reps} reps
+              {latestLog?.exercises && latestLog.exercises.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {latestLog.exercises.map((ex, idx) => {
+                    const calculated1RM = getExerciseMax1RM(ex);
+                    return (
+                      <div key={idx} className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-lg space-y-3">
+                        <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                          <span className="font-bold text-sm text-slate-100">{ex.name}</span>
+                          {calculated1RM > 0 && (
+                            <span className="text-[11px] font-bold font-mono bg-red-950/90 text-red-400 border border-red-800/60 px-2 py-0.5 rounded-md tracking-wider">
+                              推定1RM: {calculated1RM}kg
                             </span>
-                          </div>
-                        ))}
+                          )}
+                        </div>
+                        <div className="space-y-1.5 text-xs text-slate-400">
+                          {ex.sets?.map((s) => (
+                            <div 
+                              key={s.set_num} 
+                              className={`flex justify-between items-center px-3 py-1.5 rounded-lg ${s.is_max_rm ? 'bg-slate-800/80 border border-slate-700 text-slate-200' : 'bg-slate-950/60'}`}
+                            >
+                              <span className="text-slate-500 font-mono">{s.set_num} set</span>
+                              <span className={`font-mono ${s.is_max_rm ? 'text-emerald-400 font-bold' : 'text-slate-300'}`}>
+                                {s.weight_kg === 0 ? '自重' : `${s.weight_kg}kg`} × {s.reps} reps
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 text-center space-y-1">
+                  <p className="text-sm text-slate-300 font-semibold">筋トレ種目なし</p>
+                  <p className="text-xs text-slate-500">本日は有酸素運動または完全休養セッションです。</p>
+                </div>
+              )}
 
               {latestLog?.cardio && (
                 <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-lg flex items-center justify-between">
@@ -817,7 +1137,7 @@
               </button>
 
               {showPromptPreview && (
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-all">
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-all max-h-96 overflow-y-auto">
                   {generateTrainerPrompt()}
                 </div>
               )}
