@@ -159,7 +159,6 @@
       </svg>
     );
 
-    // --- 計算ユーティリティ (Epley Formula) ---
     const calculateSet1RM = (weightKg, reps) => {
       if (weightKg <= 0 || reps <= 0) return 0;
       if (reps === 1) return weightKg;
@@ -176,7 +175,6 @@
       return maxRm;
     };
 
-    // --- 初期実績データ ---
     const INITIAL_LOGS = [
       {
         id: 'log_20260815',
@@ -282,7 +280,6 @@
       }
     ];
 
-    // --- メインコンポーネント ---
     function WorkoutDashboard() {
       const [logs, setLogs] = useState(() => {
         try {
@@ -301,9 +298,8 @@
       const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [statusMsg, setStatusMsg] = useState('');
 
-      // AI解析確認・編集モーダル用ステート
+      // Modal state for AI verification & duplicate warning
       const [pendingLog, setPendingLog] = useState(null);
-      // 上書き警告モーダル用ステート
       const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
 
       useEffect(() => {
@@ -314,7 +310,6 @@
         }
       }, [logs]);
 
-      // Service Worker Cache & URL Parameters から共有コンテンツを受信
       useEffect(() => {
         const checkSharedContent = async () => {
           if ('caches' in window) {
@@ -401,7 +396,7 @@
         }
       };
 
-      // --- 筋トレMEMO専用 高精度Gemini 2.5 Flash 画像解析 ---
+      // Gemini AI OCR Parser
       const processImageFile = async (file) => {
         setIsAnalyzing(true);
         setStatusMsg('筋トレMEMO画像をAI解析中...');
@@ -420,21 +415,9 @@
 画像から正確に文字・数値をOCR抽出し、以下の定義に沿ったJSONを出力してください。
 
 【画像構造の解析ルール】
-1. 日付 (date):
-   最上部の赤背景ヘッダーに「YYYY-MM-DD WorkOut」の形式で書かれています（例: '2026-08-15 WorkOut'）。
-   ここから必ず正確な 'YYYY-MM-DD' 文字列（例: '2026-08-15'）を抽出してください。
-2. 筋トレ種目 (exercises):
-   各赤枠ボックスのタイトル（例: 「ベンチプレス」「ラットプルダウン」「アームカール」「45度バックエクステンションベンチ」等）が種目名です。
-   - セット: 各行の「重量kg × 回数reps」を抽出してください。「自重」と書かれている場合は weight_kg を 0 にしてください。
-   - 注意: 「ランニング」や「ウォーキング」等の有酸素運動のブロックは exercises に入れないでください。
-   - 注意: 画像に筋トレ種目が1つもなく有酸素運動のみの場合は、exercises を空配列 [] にしてください。架空の筋トレ種目を追加することは固く禁じます。
-3. 有酸素運動 (cardio):
-   「ランニング」や「ウォーキング」のブロックが存在する場合のみ抽出してください。
-   - type: 種目名（例: "ランニング"）
-   - distance_km: 距離の数値（例: 5.31）
-   - duration_min: 時間の数値（例: 55.0）
-   - calories: カロリーの数値（例: 393.0）
-   無い場合は null にしてください。
+1. 日付 (date): 最上部の赤背景ヘッダーに「YYYY-MM-DD WorkOut」の形式で書かれています。
+2. 筋トレ種目 (exercises): 各赤枠ボックスのタイトルが種目名です。画像に筋トレ種目が無ければ exercises: []。
+3. 有酸素運動 (cardio): ランニング等のブロックが存在する場合のみ抽出。
 `;
 
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
@@ -447,9 +430,7 @@
                         { inlineData: { mimeType: file.type || "image/png", data: base64Data } }
                       ]
                     }],
-                    generationConfig: {
-                      responseMimeType: "application/json"
-                    }
+                    generationConfig: { responseMimeType: "application/json" }
                   })
                 });
 
@@ -457,8 +438,6 @@
                   const data = await res.json();
                   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
                   const parsed = JSON.parse(rawText);
-                  
-                  // 確認・編集モーダルを開く
                   setPendingLog(parsed);
                   setIsAnalyzing(false);
                   setStatusMsg('解析完了！内容を確認してください。');
@@ -473,9 +452,7 @@
             fallbackPromptUserModal();
           }
         } else {
-          setTimeout(() => {
-            fallbackPromptUserModal();
-          }, 1000);
+          setTimeout(() => { fallbackPromptUserModal(); }, 1000);
         }
       };
 
@@ -485,12 +462,7 @@
           date: todayStr,
           rir: currentRir,
           exercises: [],
-          cardio: {
-            type: 'ランニング',
-            distance_km: 5.0,
-            duration_min: 45,
-            calories: 320
-          }
+          cardio: { type: 'ランニング', distance_km: 5.0, duration_min: 45, calories: 320 }
         };
         setPendingLog(logObj);
       };
@@ -518,34 +490,25 @@
               ]
             }
           ],
-          cardio: {
-            type: 'ランニング',
-            distance_km: 5.31,
-            duration_min: 55,
-            calories: 393
-          }
+          cardio: { type: 'ランニング', distance_km: 5.31, duration_min: 55, calories: 393 }
         };
         setPendingLog(fallbackLog);
         setIsAnalyzing(false);
         setStatusMsg('解析結果の確認をお願いします。');
       };
 
-      // 「確定して保存」処理：重複日チェック
       const handlePreAddLog = () => {
         if (!pendingLog) return;
         const targetDate = pendingLog.date || new Date().toISOString().split('T')[0];
         const isDuplicate = logs.some(l => l.date === targetDate);
 
         if (isDuplicate) {
-          // 同日の記録が既に存在する場合は上書き警告モーダルを表示
           setShowOverwriteWarning(true);
         } else {
-          // 重複が無い場合はそのまま保存実行
           executeSaveLog(false);
         }
       };
 
-      // 実際の保存実行（overwrite: true/false）
       const executeSaveLog = (overwrite) => {
         if (!pendingLog) return;
         const targetDate = pendingLog.date || new Date().toISOString().split('T')[0];
@@ -558,11 +521,9 @@
         };
 
         if (overwrite) {
-          // 既存の同日ログを置き換えて更新
           setLogs(prev => [newLogObj, ...prev.filter(l => l.date !== targetDate)]);
           setStatusMsg(`✅ ${targetDate} の記録を上書き保存しました！`);
         } else {
-          // 新規ログとして先頭に追加
           setLogs(prev => [newLogObj, ...prev]);
           setStatusMsg(`✅ ${targetDate} の記録を新しく保存しました！`);
         }
@@ -673,7 +634,7 @@
               </div>
             )}
 
-            {/* LOG ACTION BUTTONS */}
+            {/* LOG ACTION BUTTONS & Prominent Red Delete Button */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-800 cursor-pointer p-3 rounded-xl border border-slate-800 transition text-xs font-semibold text-slate-300 border-dashed border-slate-700">
                 <Upload className="w-4 h-4 text-red-400" />
@@ -690,22 +651,26 @@
                   onChange={(e) => setSelectedLogId(e.target.value)}
                   className="bg-slate-950 text-xs font-mono font-bold text-slate-200 border border-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:border-red-500 w-full truncate"
                 >
-                  {logs.map((log, index) => (
+                  {logs.map((log) => (
                     <option key={log.id} value={log.id}>
                       {log.date} ({log.exercises?.length || 0}種目)
                     </option>
                   ))}
                 </select>
+
+                {/* 赤色の目立つセッション削除ボタン */}
                 <button
                   onClick={handleDeleteCurrentLog}
                   title="選択中のログを削除"
-                  className="bg-slate-950 hover:bg-red-950/60 text-slate-400 hover:text-red-400 p-1.5 rounded-lg border border-slate-800 hover:border-red-800/60 transition flex-shrink-0"
+                  className="bg-red-950/80 hover:bg-red-900 text-red-300 px-2.5 py-1.5 rounded-lg border border-red-800/80 transition flex items-center gap-1 shrink-0 text-xs font-bold active:scale-95"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>削除</span>
                 </button>
               </div>
             </div>
 
+            {}
             {/* AI READ REVIEW MODAL (確認・編集モーダル) */}
             {pendingLog && (
               <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -916,6 +881,7 @@
               </div>
             )}
 
+            {}
             {/* PROGRESSIVE OVERLOAD INDICATOR */}
             <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4 backdrop-blur-md">
               <div className="flex items-center justify-between">
@@ -1088,6 +1054,7 @@
               </div>
             </section>
 
+            {}
             {/* EXERCISES DETAILS */}
             <section className="space-y-4 pt-2">
               <div className="flex items-center justify-between px-1">
@@ -1184,111 +1151,3 @@
   </script>
 </body>
 </html>
-```
-
-```json:マニフェスト設定:manifest.json
-{
-  "name": "専属トレーナー 筋トレLog PRO",
-  "short_name": "筋トレLog",
-  "description": "筋トレMEMOから直接ログを取り込めるプログレッシブ・オーバーロード管理アプリ",
-  "start_url": "./index.html",
-  "scope": "./",
-  "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/2548/2548537.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/2548/2548537.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
-  ],
-  "share_target": {
-    "action": "./index.html",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url",
-      "files": [
-        {
-          "name": "image",
-          "accept": ["image/*"]
-        }
-      ]
-    }
-  }
-}
-```
-
-```javascript:サービスワーカー:sw.js
-const CACHE_NAME = 'workout-log-pwa-v8';
-
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
-});
-
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  // PWA Web Share Target (POST handling for images and text)
-  if (event.request.method === 'POST') {
-    event.respondWith(
-      (async () => {
-        try {
-          const formData = await event.request.formData();
-          const imageFile = formData.get('image');
-          const sharedText = formData.get('text') || formData.get('title');
-
-          if (imageFile) {
-            const cache = await caches.open('workout-share-cache');
-            const response = new Response(imageFile, {
-              headers: { 'Content-Type': imageFile.type || 'image/png' }
-            });
-            await cache.put('shared-image', response);
-          }
-
-          let redirectPath = './index.html?shared=1';
-          if (sharedText) {
-            redirectPath += `&text=${encodeURIComponent(sharedText)}`;
-          }
-
-          const redirectUrl = new URL(redirectPath, event.request.url).toString();
-          return Response.redirect(redirectUrl, 303);
-        } catch (err) {
-          console.warn('Share target POST handler error:', err);
-          return Response.redirect(new URL('./index.html', event.request.url).toString(), 303);
-        }
-      })()
-    );
-    return;
-  }
-
-  // Regular static asset fetching
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
-  );
-});
-```
-
----
-
-### 📱 重複データを削除する手順
-1. 上記のコードをGitHubに反映（Commit）します。
-2. アプリを開き、**「ログ切替」**のドロップダウンで消したい「8月16日」のセッションを選びます。
-3. ドロップダウンのすぐ右側にある **ゴミ箱アイコン（削除ボタン）** をタップします。
-4. 確認画面で「OK」を押せば、重複していた「8月16日」のデータが完全に削除されます！
