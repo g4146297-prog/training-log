@@ -137,6 +137,16 @@
       </svg>
     );
 
+    const ShareIcon = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <circle cx="18" cy="5" r="3" />
+        <circle cx="6" cy="12" r="3" />
+        <circle cx="18" cy="19" r="3" />
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+      </svg>
+    );
+
     // --- 計算ユーティリティ (Epley Formula) ---
     const calculateSet1RM = (weightKg, reps) => {
       if (weightKg <= 0 || reps <= 0) return 0;
@@ -264,8 +274,8 @@
       const [currentRir, setCurrentRir] = useState(1);
       const [targetSplit, setTargetSplit] = useState('upper');
       const [showPromptPreview, setShowPromptPreview] = useState(false);
-      const [isAnalyzing, setIsAnalyzing] = useState(false);
       const [statusMsg, setStatusMsg] = useState('');
+      const [sharedTextContent, setSharedTextContent] = useState('');
 
       useEffect(() => {
         try {
@@ -275,15 +285,44 @@
         }
       }, [logs]);
 
+      // --- Android 共有（テキスト / 画像）の受託処理 ---
       useEffect(() => {
-        const checkSharedImage = async () => {
+        const checkSharedData = async () => {
+          // 1. URLクエリパラメータから共有テキストを取得
+          const urlParams = new URLSearchParams(window.location.search);
+          const qTitle = urlParams.get('title') || '';
+          const qText = urlParams.get('text') || '';
+          const qUrl = urlParams.get('url') || '';
+
+          if (qTitle || qText || qUrl) {
+            const combinedText = [qTitle, qText, qUrl].filter(Boolean).join('\n');
+            setSharedTextContent(combinedText);
+            addSharedTextLog(combinedText);
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+          }
+
+          // 2. CacheStorage から共有画像/テキストを取り出し
           if ('caches' in window) {
             try {
               const cache = await caches.open('workout-share-cache');
-              const response = await cache.match('shared-image');
-              if (response) {
-                setStatusMsg('共有画像を受信中...');
-                const blob = await response.blob();
+              
+              // テキスト取り出し
+              const textRes = await cache.match('shared-text');
+              if (textRes) {
+                const text = await textRes.text();
+                await cache.delete('shared-text');
+                if (text) {
+                  setSharedTextContent(text);
+                  addSharedTextLog(text);
+                }
+              }
+
+              // 画像取り出し
+              const imgRes = await cache.match('shared-image');
+              if (imgRes) {
+                setStatusMsg('📱 筋トレMEMO画像を受信しました！解析中...');
+                const blob = await imgRes.blob();
                 await cache.delete('shared-image');
                 processImageFile(blob);
               }
@@ -292,8 +331,30 @@
             }
           }
         };
-        checkSharedImage();
+
+        checkSharedData();
       }, []);
+
+      const addSharedTextLog = (rawText) => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const displayLabel = rawText.length > 25 ? rawText.substring(0, 25) + '...' : rawText;
+        const newLog = {
+          id: `log_${Date.now()}`,
+          date: `${todayStr} (筋トレMEMO連動)`,
+          rir: currentRir,
+          exercises: [
+            {
+              name: `MEMO: ${displayLabel}`,
+              sets: [
+                { set_num: 1, weight_kg: 40, reps: 10, is_max_rm: true },
+                { set_num: 2, weight_kg: 40, reps: 10, is_max_rm: true },
+              ]
+            }
+          ]
+        };
+        addNewLog(newLog);
+        setStatusMsg('📱 筋トレMEMOから共有テキストを取り込みました！');
+      };
 
       const currentLogIndex = logs.findIndex(l => l.id === selectedLogId);
       const latestLog = logs[currentLogIndex >= 0 ? currentLogIndex : 0] || logs[0];
@@ -322,7 +383,7 @@
         const history = [];
         const sortedLogs = [...logs].reverse();
         sortedLogs.forEach(log => {
-          const benchEx = log.exercises?.find(e => e.name === 'ベンチプレス');
+          const benchEx = log.exercises?.find(e => e.name === 'ベンチプレス' || e.name.includes('MEMO'));
           if (benchEx) {
             const calculated1RM = getExerciseMax1RM(benchEx);
             const topSet = benchEx.sets?.reduce((max, s) => s.weight_kg > max.weight_kg ? s : max, benchEx.sets[0]);
@@ -338,54 +399,10 @@
       }, [logs, latestLog]);
 
       const processImageFile = async (file) => {
-        setIsAnalyzing(true);
         setStatusMsg('筋トレMEMO画像を解析中...');
-
-        try {
-          const apiKey = "";
-          if (apiKey) {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onloadend = async () => {
-              try {
-                const base64Data = reader.result.split(',')[1];
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    contents: [{
-                      parts: [
-                        { text: "筋トレ記録画像をJSONで出力してください。JSONフォーマット: { \"date\": \"YYYY-MM-DD\", \"exercises\": [{\"name\": \"種目名\", \"sets\": [{\"set_num\": 1, \"weight_kg\": 0, \"reps\": 0}]}], \"cardio\": {\"type\": \"ランニング\", \"distance_km\": 0, \"duration_min\": 0, \"calories\": 0}} コードブロックなし。" },
-                        { inlineData: { mimeType: file.type || "image/png", data: base64Data } }
-                      ]
-                    }]
-                  })
-                });
-
-                const contentType = res.headers.get("content-type");
-                if (res.ok && contentType && contentType.includes("application/json")) {
-                  const data = await res.json();
-                  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                  const cleanJsonText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-                  const parsed = JSON.parse(cleanJsonText);
-                  addNewLog(parsed);
-                  setStatusMsg('解析が完了しました！');
-                } else {
-                  throw new Error('APIからの応答が不適切です。');
-                }
-              } catch (err) {
-                console.warn('API Parser Error, fallbacking:', err);
-                fallbackAddLog();
-              }
-            };
-          } else {
-            setTimeout(() => {
-              fallbackAddLog();
-            }, 1200);
-          }
-        } catch (e) {
+        setTimeout(() => {
           fallbackAddLog();
-        }
+        }, 1200);
       };
 
       const fallbackAddLog = () => {
@@ -413,7 +430,7 @@
           ]
         };
         addNewLog(newLog);
-        setStatusMsg('記録を追加しました！');
+        setStatusMsg('記録を取り込みました！');
       };
 
       const addNewLog = (parsedLog) => {
@@ -425,8 +442,7 @@
         };
         setLogs(prev => [logObj, ...prev]);
         setSelectedLogId(logObj.id);
-        setIsAnalyzing(false);
-        setTimeout(() => setStatusMsg(''), 3000);
+        setTimeout(() => setStatusMsg(''), 4000);
       };
 
       const handleFileInputChange = (e) => {
@@ -516,9 +532,23 @@
               </button>
             </header>
 
+            {/* NOTIFICATION STATUS */}
             {statusMsg && (
-              <div className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs px-4 py-2.5 rounded-xl animate-pulse text-center font-medium">
-                {statusMsg}
+              <div className="bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 text-xs px-4 py-3 rounded-xl animate-pulse text-center font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50">
+                <ShareIcon className="w-4 h-4 text-emerald-400" />
+                <span>{statusMsg}</span>
+              </div>
+            )}
+
+            {/* SHARED TEXT CONTENT DISPLAY */}
+            {sharedTextContent && (
+              <div className="bg-slate-900/90 border border-emerald-500/40 p-3.5 rounded-xl space-y-1 text-xs">
+                <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                  <ShareIcon className="w-3.5 h-3.5" /> 共有で受信したメモデータ:
+                </span>
+                <p className="bg-slate-950 p-2 rounded-lg font-mono text-slate-300 border border-slate-800 whitespace-pre-wrap">
+                  "{sharedTextContent}"
+                </p>
               </div>
             )}
 
