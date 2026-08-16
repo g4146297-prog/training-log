@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-title" content="筋トレLog">
   <meta name="description" content="科学的根拠に基づく筋肥大マネジメント & Web Share Target連動ダッシュボード">
 
-  <!-- Static Web App Manifest Link (Crucial for Android WebAPK Generation) -->
+  <!-- Static Web App Manifest Link -->
   <link rel="manifest" href="./manifest.json">
 
   <!-- External CDN Libraries -->
@@ -51,11 +51,9 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-red-500 selection:text-white">
   <div id="root"></div>
 
-  <!-- React Application Core Logic -->
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
 
-    // --- Inline SVG Icon Components ---
     const Dumbbell = ({ className = "w-6 h-6" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M2 10.5v3M22 10.5v3M9 6.5v11M15 6.5v11" />
@@ -161,7 +159,6 @@
       </svg>
     );
 
-    // --- 計算ユーティリティ (Epley Formula: 1RM = Weight * (1 + Reps/30)) ---
     const calculateSet1RM = (weightKg, reps) => {
       if (weightKg <= 0 || reps <= 0) return 0;
       if (reps === 1) return weightKg;
@@ -178,7 +175,6 @@
       return maxRm;
     };
 
-    // --- 蓄積トレーニング実績データ (2026-08-01 〜 2026-08-15) ---
     const INITIAL_LOGS = [
       {
         id: 'log_20260815',
@@ -328,7 +324,6 @@
       // Web Share Target API: Android共有経由で受け取ったデータ
       const [receivedShareData, setReceivedShareData] = useState(null);
 
-      // 1. Service Worker の登録
       useEffect(() => {
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
@@ -339,7 +334,6 @@
         }
       }, []);
 
-      // 2. Android共有メニュー（URLクエリパラメータ）からの着信データを監視・処理
       useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const sharedText = urlParams.get('text') || urlParams.get('title') || urlParams.get('url');
@@ -350,7 +344,7 @@
             timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
           });
 
-          // 共有受け取りデータを最新ログとして動的に仮追加する
+          // 共有受け取りデータを最新ログとして動的に追加する
           const todayStr = new Date().toISOString().split('T')[0];
           const sharedLog = {
             id: 'log_' + Date.now(),
@@ -370,7 +364,6 @@
           setLogs(prev => [sharedLog, ...prev]);
           setSelectedLogId(sharedLog.id);
 
-          // URLパラメータをクリアしてブラウザ履歴を整理
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }, []);
@@ -380,7 +373,6 @@
       const latestLog = logs[currentLogIndex >= 0 ? currentLogIndex : 0];
       const previousLog = logs[currentLogIndex + 1] || null;
 
-      // 総負荷量（ボリューム）動的計算
       const calculateTotalVolume = (log) => {
         if (!log || !log.exercises) return 0;
         return log.exercises.reduce((total, ex) => {
@@ -395,13 +387,11 @@
       const latestVol = useMemo(() => calculateTotalVolume(latestLog), [latestLog]);
       const prevVol = useMemo(() => calculateTotalVolume(previousLog), [previousLog]);
 
-      // 前回比増加率（%）
       const volChangePercent = useMemo(() => {
         if (!prevVol || prevVol === 0) return 0;
         return Math.round(((latestVol - prevVol) / prevVol) * 100);
       }, [latestVol, prevVol]);
 
-      // ベンチプレスの成長データ自動算出 (1RM 履歴)
       const benchPressGrowth = useMemo(() => {
         const history = [];
         const sortedLogs = [...logs].reverse();
@@ -421,7 +411,6 @@
         return history;
       }, [logs, latestLog]);
 
-      // モック：筋トレMEMO画像のダミーアップロード処理
       const handleImageUpload = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -434,7 +423,6 @@
         }, 1200);
       };
 
-      // 全過去ログ・種目別最高1RM (PR)・成長推移をすべて網羅したプロンプト動的生成
       const generateTrainerPrompt = () => {
         if (!logs || logs.length === 0) return 'まだ記録データがありません。';
         
@@ -445,7 +433,6 @@
         promptText += `■ 全期間の成長・累積成果サマリー:\n`;
         promptText += `・通算セッション数: 全${logs.length}回\n`;
         
-        // 全ログを通じた種目別最高1RM (PR) の自動算出
         const exercisePRs = {};
         logs.forEach(log => {
           log.exercises?.forEach(ex => {
@@ -500,7 +487,6 @@
         return promptText;
       };
 
-      // 安全なクリップボードコピー処理（execCommandフォールバック付）
       const copyToClipboard = () => {
         const text = generateTrainerPrompt();
         let success = false;
@@ -583,7 +569,6 @@
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* 1. 画像直接読み込みエリア */}
                 <label className="relative flex items-center justify-center gap-2 border-2 border-dashed border-slate-700 hover:border-red-500/60 bg-slate-950/80 p-3 rounded-xl cursor-pointer transition text-xs text-slate-300">
                   <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                   {isUploading ? (
@@ -598,7 +583,6 @@
                   )}
                 </label>
 
-                {/* 2. 蓄積された過去ログの選択 */}
                 <div className="flex items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800">
                   <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 shrink-0 mr-2">
                     <Calendar className="w-4 h-4 text-slate-400" /> 過去ログ:
@@ -629,7 +613,6 @@
                 </span>
               </div>
 
-              {/* Overload Status Card */}
               <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800/80 flex items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="text-sm font-extrabold text-slate-100 flex items-center gap-2 flex-wrap">
@@ -655,7 +638,6 @@
                 </div>
               </div>
 
-              {/* RIR Reps in Reserve Slider */}
               <div className="pt-3 border-t border-slate-800/80 space-y-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-medium text-slate-300 flex items-center gap-1">
@@ -704,7 +686,6 @@
                   </span>
                 </div>
 
-                {/* Growth Visual Bars */}
                 <div className="space-y-3 pt-1">
                   {benchPressGrowth.map((item, idx) => {
                     const maxRmVal = 60;
@@ -733,7 +714,6 @@
                     );
                   })}
 
-                  {/* AI Target Prediction */}
                   <div className="space-y-1 opacity-70 pt-1">
                     <div className="flex justify-between text-xs font-mono">
                       <span className="text-amber-400">09/15 (AI予測)</span>
@@ -853,7 +833,6 @@
                 })}
               </div>
 
-              {/* Cardio Card */}
               {latestLog?.cardio && (
                 <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-lg flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
