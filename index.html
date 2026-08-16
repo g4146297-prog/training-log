@@ -41,6 +41,7 @@
       });
     }
 
+    // --- SVG Icon Components ---
     const Dumbbell = ({ className = "w-6 h-6" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M2 10.5v3M22 10.5v3M9 6.5v11M15 6.5v11" />
@@ -281,6 +282,7 @@
       }
     ];
 
+    // --- メインコンポーネント ---
     function WorkoutDashboard() {
       const [logs, setLogs] = useState(() => {
         try {
@@ -312,6 +314,7 @@
         }
       }, [logs]);
 
+      // Service Worker Cache & URL Parameters から共有コンテンツを受信
       useEffect(() => {
         const checkSharedContent = async () => {
           if ('caches' in window) {
@@ -382,6 +385,23 @@
         return history;
       }, [logs, latestLog]);
 
+      // --- 選択中のセッションを削除する関数 ---
+      const handleDeleteCurrentLog = () => {
+        if (!latestLog) return;
+        if (window.confirm(`「${latestLog.date} のセッション」を削除してもよろしいですか？`)) {
+          const remainingLogs = logs.filter(l => l.id !== latestLog.id);
+          setLogs(remainingLogs);
+          if (remainingLogs.length > 0) {
+            setSelectedLogId(remainingLogs[0].id);
+          } else {
+            setSelectedLogId('');
+          }
+          setStatusMsg(`🗑️ ${latestLog.date} の記録を削除しました。`);
+          setTimeout(() => setStatusMsg(''), 3000);
+        }
+      };
+
+      // --- 筋トレMEMO専用 高精度Gemini 2.5 Flash 画像解析 ---
       const processImageFile = async (file) => {
         setIsAnalyzing(true);
         setStatusMsg('筋トレMEMO画像をAI解析中...');
@@ -661,21 +681,28 @@
                 <input type="file" accept="image/*" onChange={handleFileInputChange} className="hidden" disabled={isAnalyzing} />
               </label>
 
-              <div className="flex items-center justify-between bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-                <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-red-400" /> ログ切替:
+              <div className="flex items-center justify-between bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 gap-2">
+                <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 shrink-0">
+                  <Calendar className="w-4 h-4 text-red-400" /> ログ:
                 </span>
                 <select
                   value={selectedLogId}
                   onChange={(e) => setSelectedLogId(e.target.value)}
-                  className="bg-slate-950 text-xs font-mono font-bold text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 focus:outline-none focus:border-red-500"
+                  className="bg-slate-950 text-xs font-mono font-bold text-slate-200 border border-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:border-red-500 w-full truncate"
                 >
-                  {logs.map(log => (
+                  {logs.map((log, index) => (
                     <option key={log.id} value={log.id}>
-                      {log.date} のセッション {log.exercises?.length === 0 ? '(有酸素のみ)' : ''}
+                      {log.date} ({log.exercises?.length || 0}種目)
                     </option>
                   ))}
                 </select>
+                <button
+                  onClick={handleDeleteCurrentLog}
+                  title="選択中のログを削除"
+                  className="bg-slate-950 hover:bg-red-950/60 text-slate-400 hover:text-red-400 p-1.5 rounded-lg border border-slate-800 hover:border-red-800/60 transition flex-shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -915,8 +942,8 @@
                     <span>{volChangePercent >= 0 ? '適切な負荷アプローチ' : '調整・アクティブレスト'}</span>
                   </div>
                   <p className="text-xs text-slate-400 leading-relaxed mt-1">
-                    {latestLog.exercises?.length === 0 
-                      ? 'ℹ️ 有酸素運動メインの日です。筋肥大疲労を抜くアクティブレスト（積極的休養）として非常に効果的です。'
+                    {!latestLog || latestLog.exercises?.length === 0 
+                      ? 'ℹ️ 有酸素運動メインまたはログなしの日です。アクティブレストとして効果的です。'
                       : volChangePercent >= 0 
                         ? '✅ 筋肥大の主因である「総負荷量（メカニカルテンション）」が向上しています。'
                         : 'ℹ️ 前回セッションより全体の負荷量が抑えられています。疲労抜きとして正常です。'}
@@ -976,32 +1003,36 @@
                 </div>
 
                 <div className="space-y-3 pt-1">
-                  {benchPressGrowth.map((item, idx) => {
-                    const maxRmVal = 60;
-                    const widthPercent = Math.min(Math.round((item.rm / maxRmVal) * 100), 100);
-                    return (
-                      <div key={idx} className="space-y-1">
-                        <div className="flex justify-between text-xs font-mono">
-                          <span className={item.isLatest ? "text-emerald-400 font-bold" : "text-slate-400"}>
-                            {item.date} {item.isLatest && "(表示中)"}
-                          </span>
-                          <span className={item.isLatest ? "text-emerald-400 font-bold" : "text-slate-300"}>
-                            1RM: {item.rm} kg ({item.details})
-                          </span>
+                  {benchPressGrowth.length > 0 ? (
+                    benchPressGrowth.map((item, idx) => {
+                      const maxRmVal = 60;
+                      const widthPercent = Math.min(Math.round((item.rm / maxRmVal) * 100), 100);
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex justify-between text-xs font-mono">
+                            <span className={item.isLatest ? "text-emerald-400 font-bold" : "text-slate-400"}>
+                              {item.date} {item.isLatest && "(表示中)"}
+                            </span>
+                            <span className={item.isLatest ? "text-emerald-400 font-bold" : "text-slate-300"}>
+                              1RM: {item.rm} kg ({item.details})
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                item.isLatest
+                                  ? "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-lg shadow-emerald-500/50"
+                                  : "bg-slate-500"
+                              }`}
+                              style={{ width: `${widthPercent}%` }}
+                            ></div>
+                          </div>
                         </div>
-                        <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              item.isLatest
-                                ? "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-lg shadow-emerald-500/50"
-                                : "bg-slate-500"
-                            }`}
-                            style={{ width: `${widthPercent}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-slate-500 text-center py-2">ベンチプレスの記録がまだありません</p>
+                  )}
                 </div>
               </div>
             </section>
@@ -1064,7 +1095,7 @@
                   <TrendingUp className="w-5 h-5 text-emerald-400" /> 実施種目詳細
                 </span>
                 <span className="text-xs bg-slate-900 px-3 py-1.5 rounded-xl text-slate-300 flex items-center gap-1.5 border border-slate-800 font-mono">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" /> {latestLog?.date}
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" /> {latestLog?.date || '日付未選択'}
                 </span>
               </div>
 
@@ -1153,3 +1184,111 @@
   </script>
 </body>
 </html>
+```
+
+```json:マニフェスト設定:manifest.json
+{
+  "name": "専属トレーナー 筋トレLog PRO",
+  "short_name": "筋トレLog",
+  "description": "筋トレMEMOから直接ログを取り込めるプログレッシブ・オーバーロード管理アプリ",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2548/2548537.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2548/2548537.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "share_target": {
+    "action": "./index.html",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "image",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  }
+}
+```
+
+```javascript:サービスワーカー:sw.js
+const CACHE_NAME = 'workout-log-pwa-v8';
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // PWA Web Share Target (POST handling for images and text)
+  if (event.request.method === 'POST') {
+    event.respondWith(
+      (async () => {
+        try {
+          const formData = await event.request.formData();
+          const imageFile = formData.get('image');
+          const sharedText = formData.get('text') || formData.get('title');
+
+          if (imageFile) {
+            const cache = await caches.open('workout-share-cache');
+            const response = new Response(imageFile, {
+              headers: { 'Content-Type': imageFile.type || 'image/png' }
+            });
+            await cache.put('shared-image', response);
+          }
+
+          let redirectPath = './index.html?shared=1';
+          if (sharedText) {
+            redirectPath += `&text=${encodeURIComponent(sharedText)}`;
+          }
+
+          const redirectUrl = new URL(redirectPath, event.request.url).toString();
+          return Response.redirect(redirectUrl, 303);
+        } catch (err) {
+          console.warn('Share target POST handler error:', err);
+          return Response.redirect(new URL('./index.html', event.request.url).toString(), 303);
+        }
+      })()
+    );
+    return;
+  }
+
+  // Regular static asset fetching
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
+    })
+  );
+});
+```
+
+---
+
+### 📱 重複データを削除する手順
+1. 上記のコードをGitHubに反映（Commit）します。
+2. アプリを開き、**「ログ切替」**のドロップダウンで消したい「8月16日」のセッションを選びます。
+3. ドロップダウンのすぐ右側にある **ゴミ箱アイコン（削除ボタン）** をタップします。
+4. 確認画面で「OK」を押せば、重複していた「8月16日」のデータが完全に削除されます！
