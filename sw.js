@@ -1,65 +1,43 @@
-const CACHE_NAME = 'workout-log-pwa-v1';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json'
-];
+const CACHE_NAME = 'workout-log-pwa-v2';
 
-// サービスワーカーインストール処理
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-  );
   self.skipWaiting();
 });
 
-// サービスワーカーアクティベート処理
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME && key !== 'shared-data') {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
+  event.waitUntil(clients.claim());
 });
 
-// リクエストハンドリング（PWA Web Share Target POST対応）
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // 筋トレMEMO共有からのPOSTリクエストを静的サーバーエラー（405）にさせずキャッチ
-  if (event.request.method === 'POST') {
+  if (event.request.method === 'POST' && url.pathname.endsWith('/share-target')) {
     event.respondWith(
       (async () => {
         try {
           const formData = await event.request.formData();
-          const file = formData.get('image') || formData.get('file');
-          if (file) {
-            const cache = await caches.open('shared-data');
-            await cache.put('shared-image', new Response(file));
+          const imageFile = formData.get('image');
+
+          if (imageFile) {
+            const cache = await caches.open('workout-share-cache');
+            const response = new Response(imageFile, {
+              headers: { 'Content-Type': imageFile.type || 'image/png' }
+            });
+            await cache.put('shared-image', response);
           }
         } catch (err) {
-          console.error('Error handling PWA share POST:', err);
+          console.warn('Share target handling error:', err);
         }
-        // index.htmlへリダイレクトして、フロントエンドのReactで解析をキックさせる
+
         return Response.redirect('./index.html?shared=1', 303);
       })()
     );
     return;
   }
 
-  // 通常のGETリクエスト（キャッシュファースト）
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).catch(() => caches.match('./index.html'));
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
     })
   );
 });
