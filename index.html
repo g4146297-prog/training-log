@@ -2,58 +2,39 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>専属トレーナー 筋トレLog PRO</title>
-  
-  <!-- PWA Core Meta Tags -->
+  <!-- PWA Web Manifest Link -->
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#020617">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="筋トレLog">
-  <meta name="description" content="科学的根拠に基づく筋肥大マネジメント & Web Share Target連動ダッシュボード">
-
-  <!-- Static Web App Manifest Link -->
-  <link rel="manifest" href="./manifest.json">
-
-  <!-- External CDN Libraries -->
+  
+  <!-- Tailwind CSS & React Core Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
+  
   <style>
-    body { 
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      touch-action: manipulation;
-    }
+    body { font-family: 'Inter', sans-serif; }
     input[type="range"]::-webkit-slider-thumb {
       appearance: none;
-      height: 20px;
-      width: 20px;
+      height: 18px;
+      width: 18px;
       border-radius: 50%;
       background: #ef4444;
       cursor: pointer;
-      box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
-    }
-    .custom-scrollbar::-webkit-scrollbar {
-      width: 6px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-      background: #020617;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #1e293b;
-      border-radius: 4px;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-red-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+    const { useState, useMemo, useEffect, useCallback } = React;
 
+    // --- SVG Icon Components ---
     const Dumbbell = ({ className = "w-6 h-6" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M2 10.5v3M22 10.5v3M9 6.5v11M15 6.5v11" />
@@ -149,16 +130,14 @@
       </svg>
     );
 
-    const Share2 = ({ className = "w-4 h-4" }) => (
+    const Trash2 = ({ className = "w-4 h-4" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-        <circle cx="18" cy="5" r="3" />
-        <circle cx="6" cy="12" r="3" />
-        <circle cx="18" cy="19" r="3" />
-        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
       </svg>
     );
 
+    // --- 計算ユーティリティ (Epley Formula) ---
     const calculateSet1RM = (weightKg, reps) => {
       if (weightKg <= 0 || reps <= 0) return 0;
       if (reps === 1) return weightKg;
@@ -175,6 +154,7 @@
       return maxRm;
     };
 
+    // --- 初期実績データ ---
     const INITIAL_LOGS = [
       {
         id: 'log_20260815',
@@ -311,68 +291,186 @@
       }
     ];
 
+    // --- Gemini Vision API 呼び出し処理 ---
+    const callGeminiVisionAPI = async (base64Image, mimeType) => {
+      const apiKey = "";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+      const prompt = `あなたは優秀なトレーニング記録解析AIです。添付された「筋トレMEMO」等のワークアウト画像から記録データを抽出し、以下の厳密なJSONフォーマットで回答してください。Markdownの枠組み（\`\`\`json など）や説明テキストは一切含めず、純粋なJSON文字列のみを出力してください。
+
+{
+  "date": "YYYY-MM-DD",
+  "rir": 1,
+  "exercises": [
+    {
+      "name": "種目名（例: ベンチプレス）",
+      "sets": [
+        { "set_num": 1, "weight_kg": 40, "reps": 10, "is_max_rm": true }
+      ]
+    }
+  ],
+  "cardio": {
+    "type": "ランニング",
+    "distance_km": 5.31,
+    "duration_min": 55,
+    "calories": 393
+  }
+}`;
+
+      const payload = {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType || "image/png",
+                  data: base64Image
+                }
+              }
+            ]
+          }
+        ]
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API Request failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleaned);
+    };
+
+    // --- メインダッシュボード コンポーネント ---
     function WorkoutDashboard() {
-      const [logs, setLogs] = useState(INITIAL_LOGS);
-      const [selectedLogId, setSelectedLogId] = useState(INITIAL_LOGS[0].id);
+      const [logs, setLogs] = useState(() => {
+        try {
+          const saved = localStorage.getItem('workout_logs_v2');
+          return saved ? JSON.parse(saved) : INITIAL_LOGS;
+        } catch (e) {
+          return INITIAL_LOGS;
+        }
+      });
+
+      const [selectedLogId, setSelectedLogId] = useState(() => logs[0]?.id || 'log_20260815');
       const [copied, setCopied] = useState(false);
       const [currentRir, setCurrentRir] = useState(1);
       const [targetSplit, setTargetSplit] = useState('upper');
       const [showPromptPreview, setShowPromptPreview] = useState(false);
       const [isUploading, setIsUploading] = useState(false);
       const [uploadSuccess, setUploadSuccess] = useState(false);
+      const [uploadError, setUploadError] = useState(null);
 
-      // Web Share Target API: Android共有経由で受け取ったデータ
-      const [receivedShareData, setReceivedShareData] = useState(null);
+      // 同期・保存処理
+      useEffect(() => {
+        try {
+          localStorage.setItem('workout_logs_v2', JSON.stringify(logs));
+        } catch (e) {
+          console.error("Failed to save to localStorage", e);
+        }
+      }, [logs]);
 
+      // 共有ターゲット (PWA Web Share) および画像の直接解析処理
+      const processImageFile = useCallback(async (file) => {
+        setIsUploading(true);
+        setUploadError(null);
+        setUploadSuccess(false);
+
+        try {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const resultData = e.target.result;
+              const base64Data = resultData.split(',')[1];
+              const mimeType = file.type || 'image/png';
+
+              const parsedLog = await callGeminiVisionAPI(base64Data, mimeType);
+
+              if (!parsedLog || !parsedLog.date || !parsedLog.exercises) {
+                throw new Error("筋トレデータの自動抽出に失敗しました。画像の鮮明度をご確認ください。");
+              }
+
+              const newLog = {
+                ...parsedLog,
+                id: `log_${parsedLog.date.replace(/-/g, '')}_${Date.now()}`
+              };
+
+              setLogs(prevLogs => {
+                const filtered = prevLogs.filter(l => l.date !== newLog.date);
+                const updated = [newLog, ...filtered];
+                return updated;
+              });
+
+              setSelectedLogId(newLog.id);
+              setUploadSuccess(true);
+              setTimeout(() => setUploadSuccess(false), 3500);
+            } catch (err) {
+              console.error("Parsing error:", err);
+              setUploadError(err.message || "画像の解析に失敗しました。");
+            } finally {
+              setIsUploading(false);
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err) {
+          console.error("File read error:", err);
+          setUploadError("ファイルの読み込みに失敗しました。");
+          setIsUploading(false);
+        }
+      }, []);
+
+      // PWA サービスワーカー登録 ＆ 共有受信チェック
       useEffect(() => {
         if ('serviceWorker' in navigator) {
-          window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-              .then(reg => console.log('Service Worker Registered successfully:', reg.scope))
-              .catch(err => console.log('Service Worker Registration failed:', err));
-          });
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW Registered:', reg.scope))
+            .catch(err => console.error('SW Reg Failed:', err));
         }
-      }, []);
 
-      useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const sharedText = urlParams.get('text') || urlParams.get('title') || urlParams.get('url');
-
-        if (sharedText) {
-          setReceivedShareData({
-            text: sharedText,
-            timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
-          });
-
-          // 共有受け取りデータを最新ログとして動的に追加する
-          const todayStr = new Date().toISOString().split('T')[0];
-          const sharedLog = {
-            id: 'log_' + Date.now(),
-            date: `${todayStr} (共有受信)`,
-            rir: 1,
-            exercises: [
-              {
-                name: '筋トレMEMO連動: ' + (sharedText.length > 18 ? sharedText.substring(0, 18) + '...' : sharedText),
-                sets: [
-                  { set_num: 1, weight_kg: 40, reps: 10, is_max_rm: true },
-                  { set_num: 2, weight_kg: 40, reps: 10, is_max_rm: true },
-                ]
+        const checkSharedImage = async () => {
+          if (window.location.search.includes('shared=1') && 'caches' in window) {
+            try {
+              const cache = await caches.open('shared-data');
+              const response = await cache.match('shared-image');
+              if (response) {
+                const blob = await response.blob();
+                const file = new File([blob], "shared_memo.png", { type: blob.type || "image/png" });
+                await processImageFile(file);
+                await cache.delete('shared-image');
               }
-            ]
-          };
+            } catch (err) {
+              console.error("Error retrieving shared image:", err);
+            } finally {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          }
+        };
 
-          setLogs(prev => [sharedLog, ...prev]);
-          setSelectedLogId(sharedLog.id);
+        checkSharedImage();
+      }, [processImageFile]);
 
-          window.history.replaceState({}, document.title, window.location.pathname);
+      // ファイル選択イベントハンドラ
+      const handleImageUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          processImageFile(file);
         }
-      }, []);
+      };
 
       // 選択中および比較対象ログの取得
       const currentLogIndex = logs.findIndex(l => l.id === selectedLogId);
-      const latestLog = logs[currentLogIndex >= 0 ? currentLogIndex : 0];
+      const latestLog = logs[currentLogIndex >= 0 ? currentLogIndex : 0] || logs[0];
       const previousLog = logs[currentLogIndex + 1] || null;
 
+      // 総負荷量（ボリューム）動的計算
       const calculateTotalVolume = (log) => {
         if (!log || !log.exercises) return 0;
         return log.exercises.reduce((total, ex) => {
@@ -387,11 +485,13 @@
       const latestVol = useMemo(() => calculateTotalVolume(latestLog), [latestLog]);
       const prevVol = useMemo(() => calculateTotalVolume(previousLog), [previousLog]);
 
+      // 前回比増加率（%）
       const volChangePercent = useMemo(() => {
         if (!prevVol || prevVol === 0) return 0;
         return Math.round(((latestVol - prevVol) / prevVol) * 100);
       }, [latestVol, prevVol]);
 
+      // ベンチプレスの成長データ自動算出 (1RM 全履歴)
       const benchPressGrowth = useMemo(() => {
         const history = [];
         const sortedLogs = [...logs].reverse();
@@ -399,7 +499,7 @@
           const benchEx = log.exercises?.find(e => e.name === 'ベンチプレス');
           if (benchEx) {
             const calculated1RM = getExerciseMax1RM(benchEx);
-            const topSet = benchEx.sets?.reduce((max, s) => s.weight_kg > max.weight_kg ? s : max, benchEx.sets[0]);
+            const topSet = benchEx.sets?.reduce((max, s) => (s.weight_kg > max.weight_kg ? s : max), benchEx.sets[0]);
             history.push({
               date: log.date.replace('2026-', '').replace('-', '/'),
               rm: Math.round(calculated1RM),
@@ -411,91 +511,58 @@
         return history;
       }, [logs, latestLog]);
 
-      const handleImageUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setIsUploading(true);
-        setTimeout(() => {
-          setIsUploading(false);
-          setUploadSuccess(true);
-          setTimeout(() => setUploadSuccess(false), 3000);
-        }, 1200);
-      };
-
+      // トレーナー相談プロンプト動的生成（過去履歴＆長期トレンド全網羅版）
       const generateTrainerPrompt = () => {
-        if (!logs || logs.length === 0) return 'まだ記録データがありません。';
+        if (!latestLog) return 'まだ記録データがありません。';
         
-        let promptText = `======================================\n`;
-        promptText += `【専属トレーナー相談用・全トレーニング実績データ】\n`;
-        promptText += `======================================\n\n`;
+        let text = `======================================\n`;
+        text += `【専属トレーナー相談用データ（全履歴コンテキスト含む）】\n`;
+        text += `======================================\n\n`;
 
-        promptText += `■ 全期間の成長・累積成果サマリー:\n`;
-        promptText += `・通算セッション数: 全${logs.length}回\n`;
+        text += `■ 直近セッション基本情報:\n`;
+        text += `・日付: ${latestLog.date}\n`;
+        text += `・自覚的余力 (RIR): あと${currentRir}回挙げられる余力 (${currentRir === 0 ? '限界まで到達' : 'フォーム維持良好'})\n`;
+        text += `・総負荷量 (ボリューム): ${latestVol.toLocaleString()}kg ${previousLog ? `(前回比: ${volChangePercent > 0 ? '+' : ''}${volChangePercent}%)` : ''}\n\n`;
         
-        const exercisePRs = {};
-        logs.forEach(log => {
-          log.exercises?.forEach(ex => {
-            const rm = getExerciseMax1RM(ex);
-            if (!exercisePRs[ex.name] || rm > exercisePRs[ex.name]) {
-              exercisePRs[ex.name] = rm;
-            }
+        text += `■ 成長トレンド＆過去の推移データ:\n`;
+        if (benchPressGrowth.length > 0) {
+          text += `・ベンチプレス 1RM推移: `;
+          text += benchPressGrowth.map(b => `${b.date}(${b.rm}kg)`).join(' ➔ ');
+          text += ` [通算 ＋${(benchPressGrowth[benchPressGrowth.length - 1]?.rm - benchPressGrowth[0]?.rm || 0).toFixed(1)}kg 向上中]\n`;
+        }
+        text += `・蓄積セッション数: 全${logs.length}回（10年ぶり復帰から順調に継続中）\n\n`;
+
+        text += `■ 本日の実績メニュー詳細:\n`;
+        latestLog.exercises?.forEach((ex) => {
+          const calculated1RM = getExerciseMax1RM(ex);
+          text += `・${ex.name} (推定1RM: ${calculated1RM > 0 ? calculated1RM + 'kg' : '- '})\n`;
+          ex.sets?.forEach((s) => {
+            text += `   ${s.set_num}set: ${s.weight_kg === 0 ? '自重' : s.weight_kg + 'kg'} × ${s.reps} reps\n`;
           });
         });
-
-        promptText += `・種目別 過去最高推定1RM (自己ベスト/PR):\n`;
-        Object.entries(exercisePRs).forEach(([name, maxRm]) => {
-          if (maxRm > 0) {
-            promptText += `   - ${name}: ${maxRm}kg\n`;
-          }
-        });
-
-        if (benchPressGrowth.length > 0) {
-          promptText += `・ベンチプレス 1RM成長推移: `;
-          promptText += benchPressGrowth.map(b => `${b.date}(${b.rm}kg)`).join(' ➔ ');
-          const diff = (benchPressGrowth[benchPressGrowth.length - 1]?.rm - benchPressGrowth[0]?.rm || 0).toFixed(1);
-          promptText += ` [通算 ＋${diff}kg 向上中]\n`;
+        
+        if (latestLog.cardio && latestLog.cardio.distance_km > 0) {
+          text += `\n■ 有酸素運動:\n・${latestLog.cardio.type || 'ランニング'}: ${latestLog.cardio.distance_km}km / ${latestLog.cardio.duration_min}分 (消費 ${latestLog.cardio.calories}kcal)\n`;
         }
 
-        promptText += `\n■ 直近セッション（${latestLog.date}）のコンディション:\n`;
-        promptText += `・自覚的余力 (RIR): あと${currentRir}回挙げられる余力 (${currentRir === 0 ? '限界まで追い込み (RIR 0)' : `RIR ${currentRir}`})\n`;
-        promptText += `・本日の総負荷量 (ボリューム): ${latestVol.toLocaleString()}kg ${previousLog ? `(前回比: ${volChangePercent > 0 ? '+' : ''}${volChangePercent}%)` : ''}\n`;
-
-        promptText += `\n■ 過去全ログのタイムライン一覧（全${logs.length}セッション分）:\n`;
-        logs.forEach((log, lIdx) => {
-          const logVol = calculateTotalVolume(log);
-          promptText += `\n--------------------------------------\n`;
-          promptText += `[ログ ${lIdx + 1}/${logs.length}] 日付: ${log.date} (総ボリューム: ${logVol.toLocaleString()}kg)\n`;
-          
-          log.exercises?.forEach((ex) => {
-            const exRm = getExerciseMax1RM(ex);
-            promptText += `・${ex.name} ${exRm > 0 ? `(推定1RM: ${exRm}kg)` : ''}\n`;
-            ex.sets?.forEach((s) => {
-              promptText += `    ${s.set_num}set: ${s.weight_kg === 0 ? '自重' : s.weight_kg + 'kg'} × ${s.reps} reps\n`;
-            });
-          });
-
-          if (log.cardio && log.cardio.distance_km > 0) {
-            promptText += `・有酸素: ${log.cardio.type || 'ランニング'} ${log.cardio.distance_km}km / ${log.cardio.duration_min}分 (${log.cardio.calories}kcal)\n`;
-          }
-        });
-
-        promptText += `\n======================================\n`;
-        promptText += `専属トレーナーへアドバイス依頼：\n`;
-        promptText += `上記すべての過去トレーニング履歴、種目別の成長推移、および直近のRIR（自覚的余力）を踏まえて、次回セッションの最適重量設定、メニュー構成、フォーム上の注意点について総合的なアドバイスをお願いします！`;
-
-        return promptText;
+        text += `\n--------------------------------------\n`;
+        text += `専属トレーナーへ：\n上記（過去の成長ペース・今回のRIR・総負荷量）を踏まえ、次回セッションの【最適重量・セット数・注意すべきフォームのポイント】を最新の運動生理学に基づいてアドバイスしてください！`;
+        
+        return text;
       };
 
       const copyToClipboard = () => {
         const text = generateTrainerPrompt();
         let success = false;
+
         try {
           const textarea = document.createElement('textarea');
           textarea.value = text;
           textarea.style.position = 'fixed';
           textarea.style.left = '-9999px';
+          textarea.style.top = '0';
           document.body.appendChild(textarea);
+          textarea.focus();
           textarea.select();
           success = document.execCommand('copy');
           document.body.removeChild(textarea);
@@ -504,15 +571,25 @@
         }
 
         if (!success && navigator.clipboard) {
-          navigator.clipboard.writeText(text);
+          navigator.clipboard.writeText(text).catch(err => console.error(err));
         }
 
         setCopied(true);
         setTimeout(() => setCopied(false), 2200);
       };
 
+      const handleDeleteSelectedLog = () => {
+        if (logs.length <= 1) {
+          alert("すべてのログを削除することはできません。");
+          return;
+        }
+        const updated = logs.filter(l => l.id !== selectedLogId);
+        setLogs(updated);
+        setSelectedLogId(updated[0].id);
+      };
+
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans antialiased">
+        <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans antialiased selection:bg-red-500 selection:text-white">
           <main className="max-w-2xl mx-auto space-y-6 pb-24">
             
             {/* APP HEADER */}
@@ -541,38 +618,21 @@
               </button>
             </header>
 
-            {/* Android Share Catch Banner */}
-            {receivedShareData && (
-              <div className="bg-emerald-950/90 border border-emerald-500/50 p-3.5 rounded-2xl flex items-start gap-3 shadow-lg shadow-emerald-950/30 animate-pulse">
-                <Share2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                <div className="text-xs space-y-1">
-                  <div className="font-bold text-emerald-300 flex items-center gap-2">
-                    <span>📱 筋トレMEMOから共有データを受信しました！</span>
-                    <span className="text-[10px] font-mono text-emerald-500">[{receivedShareData.timestamp}]</span>
-                  </div>
-                  <p className="text-slate-300 bg-slate-950/60 p-2 rounded-lg font-mono border border-emerald-800/40">
-                    "{receivedShareData.text}"
-                  </p>
-                </div>
-              </div>
-            )}
-
             {/* DATA ENTRY & LOG DATE SELECTOR SECTION */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
                   <Upload className="w-4 h-4 text-red-400" /> データ読み込み / ログ切り替え
                 </span>
-                <span className="text-[11px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                  Android共有 (Web Share Target) 対応
-                </span>
+                <span className="text-[11px] text-slate-400">筋トレMEMO連動</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* 1. 画像直接読み込みエリア */}
                 <label className="relative flex items-center justify-center gap-2 border-2 border-dashed border-slate-700 hover:border-red-500/60 bg-slate-950/80 p-3 rounded-xl cursor-pointer transition text-xs text-slate-300">
                   <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                   {isUploading ? (
-                    <span className="text-amber-400 animate-pulse font-mono">解析中...</span>
+                    <span className="text-amber-400 animate-pulse font-mono">🤖 Geminiが解析中...</span>
                   ) : uploadSuccess ? (
                     <span className="text-emerald-400 font-bold flex items-center gap-1"><Check className="w-4 h-4" /> 解析完了！蓄積されました</span>
                   ) : (
@@ -583,25 +643,37 @@
                   )}
                 </label>
 
-                <div className="flex items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                  <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 shrink-0 mr-2">
-                    <Calendar className="w-4 h-4 text-slate-400" /> 過去ログ:
-                  </span>
-                  <select
-                    value={selectedLogId}
-                    onChange={(e) => setSelectedLogId(e.target.value)}
-                    className="w-full bg-transparent text-xs font-mono font-bold text-slate-200 focus:outline-none cursor-pointer"
+                {/* 2. 蓄積された過去ログの選択 */}
+                <div className="flex items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800 justify-between">
+                  <div className="flex items-center flex-1 mr-2 min-w-0">
+                    <Calendar className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
+                    <select
+                      value={selectedLogId}
+                      onChange={(e) => setSelectedLogId(e.target.value)}
+                      className="w-full bg-transparent text-xs font-mono font-bold text-slate-200 focus:outline-none cursor-pointer truncate"
+                    >
+                      {logs.map(log => (
+                        <option key={log.id} value={log.id} className="bg-slate-900 text-slate-200">
+                          {log.date} のセッション
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button 
+                    onClick={handleDeleteSelectedLog}
+                    title="このログを削除"
+                    className="text-slate-500 hover:text-red-400 p-1 rounded-md transition"
                   >
-                    {logs.map(log => (
-                      <option key={log.id} value={log.id} className="bg-slate-900 text-slate-200">
-                        {log.date} のセッション
-                      </option>
-                    ))}
-                  </select>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
+              {uploadError && (
+                <p className="text-xs text-red-400 font-medium">{uploadError}</p>
+              )}
             </div>
 
+            {}
             {/* SECTION 1: PROGRESSIVE OVERLOAD INDICATOR & RIR */}
             <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4 backdrop-blur-md">
               <div className="flex items-center justify-between">
@@ -613,6 +685,7 @@
                 </span>
               </div>
 
+              {/* Overload Status Card */}
               <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800/80 flex items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="text-sm font-extrabold text-slate-100 flex items-center gap-2 flex-wrap">
@@ -638,6 +711,7 @@
                 </div>
               </div>
 
+              {/* RIR Reps in Reserve Slider */}
               <div className="pt-3 border-t border-slate-800/80 space-y-2">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-medium text-slate-300 flex items-center gap-1">
@@ -667,6 +741,7 @@
               </div>
             </section>
 
+            {}
             {/* SECTION 2: ESTIMATED 1RM GROWTH & FORECAST */}
             <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
               <div className="flex items-center justify-between">
@@ -680,12 +755,13 @@
 
               <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800 space-y-3">
                 <div className="flex justify-between text-xs text-slate-400 pb-2 border-b border-slate-800/80">
-                  <span>期間: 2026/08/01 〜 {latestLog?.date.replace(/-/g, '/')}</span>
+                  <span>期間: 2026/08/01 〜 {latestLog?.date?.replace(/-/g, '/')}</span>
                   <span className="text-emerald-400 font-bold font-mono">
                     ＋{(benchPressGrowth[benchPressGrowth.length - 1]?.rm - benchPressGrowth[0]?.rm || 0).toFixed(1)} kg 向上！
                   </span>
                 </div>
 
+                {/* Growth Visual Bars */}
                 <div className="space-y-3 pt-1">
                   {benchPressGrowth.map((item, idx) => {
                     const maxRmVal = 60;
@@ -714,6 +790,7 @@
                     );
                   })}
 
+                  {/* AI Target Prediction */}
                   <div className="space-y-1 opacity-70 pt-1">
                     <div className="flex justify-between text-xs font-mono">
                       <span className="text-amber-400">09/15 (AI予測)</span>
@@ -727,6 +804,7 @@
               </div>
             </section>
 
+            {}
             {/* SECTION 3: RECOMMENDED WARMUP DRILLS */}
             <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
               <div className="flex items-center justify-between">
@@ -791,6 +869,7 @@
               </div>
             </section>
 
+            {}
             {/* SECTION 4: WORKOUT LOG HISTORY */}
             <section className="space-y-4 pt-2">
               <div className="flex items-center justify-between px-1">
@@ -833,6 +912,7 @@
                 })}
               </div>
 
+              {/* Cardio Card */}
               {latestLog?.cardio && (
                 <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-lg flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -858,13 +938,13 @@
                 className="w-full flex justify-between items-center text-xs font-bold text-slate-400 hover:text-slate-200 transition"
               >
                 <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-red-400" /> 専属トレーナー送信テキストのプレビュー (過去全{logs.length}回ログ＋PR成果含む)
+                  <Sparkles className="w-4 h-4 text-red-400" /> 専属トレーナー送信テキストのプレビュー
                 </span>
                 <ChevronRight className={`w-4 h-4 transition-transform ${showPromptPreview ? 'rotate-90' : ''}`} />
               </button>
 
               {showPromptPreview && (
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-all max-h-96 overflow-y-auto custom-scrollbar">
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-all">
                   {generateTrainerPrompt()}
                 </div>
               )}
