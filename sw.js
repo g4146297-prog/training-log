@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workout-log-pwa-v2';
+const CACHE_NAME = 'workout-log-pwa-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -11,6 +11,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // PWA Web Share Target POST Handling
   if (event.request.method === 'POST' && url.pathname.endsWith('/share-target')) {
     event.respondWith(
       (async () => {
@@ -29,12 +30,15 @@ self.addEventListener('fetch', (event) => {
           console.warn('Share target handling error:', err);
         }
 
-        return Response.redirect('./index.html?shared=1', 303);
+        // Must use absolute URL for Response.redirect to prevent 405 Method Not Allowed
+        const redirectUrl = new URL('./index.html?shared=1', event.request.url).toString();
+        return Response.redirect(redirectUrl, 303);
       })()
     );
     return;
   }
 
+  // Regular static asset fetching
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request);
