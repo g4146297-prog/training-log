@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>専属トレーナー 筋トレLog PRO</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      background: #ef4444;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+
+    const Dumbbell = ({ className = "w-6 h-6" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M2 10.5v3M22 10.5v3M9 6.5v11M15 6.5v11" />
+      </svg>
+    );
+
+    const Flame = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    );
+
+    const Copy = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+      </svg>
+    );
+
+    const Check = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    );
+
+    const TrendingUp = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+        <polyline points="17 6 23 6 23 12" />
+      </svg>
+    );
+
+    const Calendar = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+    );
+
+    const ShieldCheck = ({ className = "w-6 h-6" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <polyline points="9 12 11 14 15 10" />
+      </svg>
+    );
+
+    const Zap = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+    );
+
+    const Activity = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+      </svg>
+    );
+
+    const BarChart2 = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+      </svg>
+    );
+
+    const Sparkles = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <path d="M12 3v3m0 12v3M3 12h3m12 0h3m-3.5-6.5l-2 2m-7 7l-2 2m0-11l2 2m7 7l2 2" />
+      </svg>
+    );
+
+    const ChevronRight = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    );
+
+    const Info = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12.01" y2="8" />
+      </svg>
+    );
+
+    const Upload = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+      </svg>
+    );
+
+    const calculateSet1RM = (weightKg, reps) => {
+      if (weightKg <= 0 || reps <= 0) return 0;
+      if (reps === 1) return weightKg;
+      return Math.round(weightKg * (1 + reps / 30) * 10) / 10;
+    };
+
+    const getExerciseMax1RM = (exercise) => {
+      if (!exercise || !exercise.sets || exercise.sets.length === 0) return 0;
+      let maxRm = 0;
+      exercise.sets.forEach(s => {
+        const rm = calculateSet1RM(s.weight_kg, s.reps);
+        if (rm > maxRm) maxRm = rm;
+      });
+      return maxRm;
+    };
+
+    const INITIAL_LOGS = [
+      {
+        id: 'log_20260815',
+        date: '2026-08-15',
+        rir: 1,
+        exercises: [
+          {
+            name: 'ベンチプレス',
+            sets: [
+              { set_num: 1, weight_kg: 20, reps: 10 },
+              { set_num: 2, weight_kg: 40, reps: 10, is_max_rm: true },
+              { set_num: 3, weight_kg: 40, reps: 10, is_max_rm: true },
+              { set_num: 4, weight_kg: 40, reps: 10, is_max_rm: true },
+            ]
+          },
+          {
+            name: 'ラットプルダウン',
+            sets: [
+              { set_num: 1, weight_kg: 39, reps: 10, is_max_rm: true },
+              { set_num: 2, weight_kg: 39, reps: 10, is_max_rm: true },
+              { set_num: 3, weight_kg: 32, reps: 10 },
+            ]
+          },
+          {
+            name: 'アームカール',
+            sets: [
+              { set_num: 1, weight_kg: 9, reps: 10, is_max_rm: true },
+              { set_num: 2, weight_kg: 9, reps: 10, is_max_rm: true },
+            ]
+          },
+          {
+            name: '45度バックエクステンション',
+            sets: [
+              { set_num: 1, weight_kg: 0, reps: 10 },
+              { set_num: 2, weight_kg: 0, reps: 10 },
+              { set_num: 3, weight_kg: 0, reps: 10 },
+            ]
+          }
+        ],
+        cardio: {
+          type: 'ランニング',
+          distance_km: 5.31,
+          duration_min: 55,
+          calories: 393
+        }
+      },
+      {
+        id: 'log_20260806',
+        date: '2026-08-06',
+        rir: 1,
+        exercises: [
+          {
+            name: 'ベンチプレス',
+            sets: [
+              { set_num: 1, weight_kg: 20, reps: 10 },
+              { set_num: 2, weight_kg: 35, reps: 10 },
+              { set_num: 3, weight_kg: 37.5, reps: 10, is_max_rm: true },
+              { set_num: 4, weight_kg: 37.5, reps: 4 },
+              { set_num: 5, weight_kg: 20, reps: 10 },
+            ]
+          },
+          {
+            name: 'アームカール',
+            sets: [
+              { set_num: 1, weight_kg: 6, reps: 10, is_max_rm: true },
+              { set_num: 2, weight_kg: 6, reps: 10, is_max_rm: true },
+            ]
+          },
+          {
+            name: 'ダンベルシュラッグ',
+            sets: [
+              { set_num: 1, weight_kg: 12, reps: 10, is_max_rm: true },
+            ]
+          }
+        ],
+        cardio: {
+          type: 'ランニング',
+          distance_km: 4.72,
+          duration_min: 55,
+          calories: 363
+        }
+      },
+      {
+        id: 'log_20260803',
+        date: '2026-08-03',
+        rir: 1,
+        exercises: [
+          {
+            name: 'デッドリフト',
+            sets: [
+              { set_num: 1, weight_kg: 35, reps: 10, is_max_rm: true },
+            ]
+          },
+          {
+            name: 'レッグプレス',
+            sets: [
+              { set_num: 1, weight_kg: 27, reps: 20, is_max_rm: true },
+              { set_num: 2, weight_kg: 27, reps: 20, is_max_rm: true },
+              { set_num: 3, weight_kg: 27, reps: 20, is_max_rm: true },
+            ]
+          }
+        ],
+        cardio: {
+          type: 'ランニング',
+          distance_km: 5.15,
+          duration_min: 58,
+          calories: 278
+        }
+      },
+      {
+        id: 'log_20260801',
+        date: '2026-08-01',
+        rir: 0,
+        exercises: [
+          {
+            name: 'ベンチプレス',
+            sets: [
+              { set_num: 1, weight_kg: 20, reps: 10 },
+              { set_num: 2, weight_kg: 20, reps: 10 },
+              { set_num: 3, weight_kg: 30, reps: 10 },
+              { set_num: 4, weight_kg: 40, reps: 5, is_max_rm: true },
+              { set_num: 5, weight_kg: 40, reps: 5, is_max_rm: true },
+            ]
+          },
+          {
+            name: 'ラットプルダウン',
+            sets: [
+              { set_num: 1, weight_kg: 45, reps: 4, is_max_rm: true },
+              { set_num: 2, weight_kg: 32, reps: 10 },
+              { set_num: 3, weight_kg: 32, reps: 10 },
+            ]
+          }
+        ]
+      }
+    ];
+
+    function WorkoutDashboard() {
+      const [logs, setLogs] = useState(INITIAL_LOGS);
+      const [selectedLogId, setSelectedLogId] = useState(INITIAL_LOGS[0].id);
+      const [copied, setCopied] = useState(false);
+      const [currentRir, setCurrentRir] = useState(1);
+      const [targetSplit, setTargetSplit] = useState('upper');
+      const [showPromptPreview, setShowPromptPreview] = useState(false);
+      const [isUploading, setIsUploading] = useState(false);
+      const [uploadSuccess, setUploadSuccess] = useState(false);
+
+      // 選択中および比較対象ログの取得
+      const currentLogIndex = logs.findIndex(l => l.id === selectedLogId);
+      const latestLog = logs[currentLogIndex >= 0 ? currentLogIndex : 0];
+      const previousLog = logs[currentLogIndex + 1] || null;
+
+      // 総負荷量（ボリューム）動的計算
+      const calculateTotalVolume = (log) => {
+        if (!log || !log.exercises) return 0;
+        return log.exercises.reduce((total, ex) => {
+          const exVol = ex.sets?.reduce((sTotal, s) => {
+            const weight = s.weight_kg === 0 ? 10 : s.weight_kg;
+            return sTotal + (weight * s.reps);
+          }, 0) || 0;
+          return total + exVol;
+        }, 0);
+      };
+
+      const latestVol = useMemo(() => calculateTotalVolume(latestLog), [latestLog]);
+      const prevVol = useMemo(() => calculateTotalVolume(previousLog), [previousLog]);
+
+      // 前回比増加率（%）
+      const volChangePercent = useMemo(() => {
+        if (!prevVol || prevVol === 0) return 0;
+        return Math.round(((latestVol - prevVol) / prevVol) * 100);
+      }, [latestVol, prevVol]);
+
+      // ベンチプレスの成長データ自動算出 (1RM 履歴)
+      const benchPressGrowth = useMemo(() => {
+        const history = [];
+        const sortedLogs = [...logs].reverse();
+        sortedLogs.forEach(log => {
+          const benchEx = log.exercises?.find(e => e.name === 'ベンチプレス');
+          if (benchEx) {
+            const calculated1RM = getExerciseMax1RM(benchEx);
+            const topSet = benchEx.sets?.reduce((max, s) => s.weight_kg > max.weight_kg ? s : max, benchEx.sets[0]);
+            history.push({
+              date: log.date.replace('2026-', '').replace('-', '/'),
+              rm: Math.round(calculated1RM),
+              details: `${topSet ? topSet.weight_kg : 0}kg × ${topSet ? topSet.reps : 0}reps`,
+              isLatest: log.id === latestLog?.id
+            });
+          }
+        });
+        return history;
+      }, [logs, latestLog]);
+
+      // モック：筋トレMEMO画像のダミーアップロード処理
+      const handleImageUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        // AI解析を模した1.5秒のローディング
+        setTimeout(() => {
+          setIsUploading(false);
+          setUploadSuccess(true);
+          setTimeout(() => setUploadSuccess(false), 3000);
+        }, 1500);
+      };
+
+      // トレーナー相談プロンプト動的生成（過去全ログ・種目別最高1RM・成長トレンド全網羅版）
+      const generateTrainerPrompt = () => {
+        if (!logs || logs.length === 0) return 'まだ記録データがありません。';
+        
+        let promptText = `======================================\n`;
+        promptText += `【専属トレーナー相談用・全トレーニング実績データ】\n`;
+        promptText += `======================================\n\n`;
+
+        promptText += `■ 全期間の成長・累積成果サマリー:\n`;
+        promptText += `・通算セッション数: 全${logs.length}回\n`;
+        
+        // 全ログを通じた種目別最高1RM (PR) の自動算出
+        const exercisePRs = {};
+        logs.forEach(log => {
+          log.exercises?.forEach(ex => {
+            const rm = getExerciseMax1RM(ex);
+            if (!exercisePRs[ex.name] || rm > exercisePRs[ex.name]) {
+              exercisePRs[ex.name] = rm;
+            }
+          });
+        });
+
+        promptText += `・種目別 過去最高推定1RM (自己ベスト/PR):\n`;
+        Object.entries(exercisePRs).forEach(([name, maxRm]) => {
+          if (maxRm > 0) {
+            promptText += `   - ${name}: ${maxRm}kg\n`;
+          }
+        });
+
+        if (benchPressGrowth.length > 0) {
+          promptText += `・ベンチプレス 1RM成長推移: `;
+          promptText += benchPressGrowth.map(b => `${b.date}(${b.rm}kg)`).join(' ➔ ');
+          const diff = (benchPressGrowth[benchPressGrowth.length - 1]?.rm - benchPressGrowth[0]?.rm || 0).toFixed(1);
+          promptText += ` [通算 ＋${diff}kg 向上中]\n`;
+        }
+
+        promptText += `\n■ 直近セッション（${latestLog.date}）のコンディション:\n`;
+        promptText += `・自覚的余力 (RIR): あと${currentRir}回挙げられる余力 (${currentRir === 0 ? '限界まで追い込み (RIR 0)' : `RIR ${currentRir}`})\n`;
+        promptText += `・本日の総負荷量 (ボリューム): ${latestVol.toLocaleString()}kg ${previousLog ? `(前回比: ${volChangePercent > 0 ? '+' : ''}${volChangePercent}%)` : ''}\n`;
+
+        promptText += `\n■ 過去全ログのタイムライン一覧（全${logs.length}セッション分）:\n`;
+        logs.forEach((log, lIdx) => {
+          const logVol = calculateTotalVolume(log);
+          promptText += `\n--------------------------------------\n`;
+          promptText += `[ログ ${lIdx + 1}/${logs.length}] 日付: ${log.date} (総ボリューム: ${logVol.toLocaleString()}kg)\n`;
+          
+          log.exercises?.forEach((ex) => {
+            const exRm = getExerciseMax1RM(ex);
+            promptText += `・${ex.name} ${exRm > 0 ? `(推定1RM: ${exRm}kg)` : ''}\n`;
+            ex.sets?.forEach((s) => {
+              promptText += `    ${s.set_num}set: ${s.weight_kg === 0 ? '自重' : s.weight_kg + 'kg'} × ${s.reps} reps\n`;
+            });
+          });
+
+          if (log.cardio && log.cardio.distance_km > 0) {
+            promptText += `・有酸素: ${log.cardio.type || 'ランニング'} ${log.cardio.distance_km}km / ${log.cardio.duration_min}分 (${log.cardio.calories}kcal)\n`;
+          }
+        });
+
+        promptText += `\n======================================\n`;
+        promptText += `専属トレーナーへアドバイス依頼：\n`;
+        promptText += `上記すべての過去トレーニング履歴、種目別の成長推移、および直近のRIR（自覚的余力）を踏まえて、次回セッションの最適重量設定、メニュー構成、フォーム上の注意点について総合的なアドバイスをお願いします！`;
+
+        return promptText;
+      };
+
+      const copyToClipboard = () => {
+        const text = generateTrainerPrompt();
+        let success = false;
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          success = document.execCommand('copy');
+          document.body.removeChild(textarea);
+        } catch (err) {
+          console.error('Copy error:', err);
+        }
+
+        if (!success && navigator.clipboard) {
+          navigator.clipboard.writeText(text);
+        }
+
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2200);
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans antialiased selection:bg-red-500 selection:text-white">
+          <main className="max-w-2xl mx-auto space-y-6 pb-24">
+            
+            {/* APP HEADER */}
+            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
+              <div className="flex items-center space-x-3">
+                <div className="bg-red-500/15 p-2.5 rounded-xl border border-red-500/30 shadow-lg shadow-red-950/40">
+                  <Dumbbell className="w-7 h-7 text-red-500" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold tracking-wide text-white">専属トレーナー 筋トレLog</h1>
+                    <span className="text-[10px] bg-red-950 text-red-400 border border-red-800/50 px-2 py-0.5 rounded-full font-mono">
+                      PRO
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">科学的根拠に基づく筋肥大マネジメント</p>
+                </div>
+              </div>
+
+              <button
+                onClick={copyToClipboard}
+                className="w-full sm:w-auto flex items-center justify-center space-x-1.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 active:scale-95 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-red-950/60 transition-all border border-red-400/30"
+              >
+                {copied ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? 'コピー完了！' : '相談サマリー'}</span>
+              </button>
+            </header>
+
+            {/* DATA ENTRY & LOG DATE SELECTOR SECTION */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Upload className="w-4 h-4 text-red-400" /> データ読み込み / ログ切り替え
+                </span>
+                <span className="text-[11px] text-slate-400">筋トレMEMO連動</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* 1. 画像直接読み込みエリア */}
+                <label className="relative flex items-center justify-center gap-2 border-2 border-dashed border-slate-700 hover:border-red-500/60 bg-slate-950/80 p-3 rounded-xl cursor-pointer transition text-xs text-slate-300">
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                  {isUploading ? (
+                    <span className="text-amber-400 animate-pulse font-mono">解析中...</span>
+                  ) : uploadSuccess ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1"><Check className="w-4 h-4" /> 解析完了！蓄積されました</span>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 text-slate-400" />
+                      <span>筋トレMEMO画像をアップロード</span>
+                    </>
+                  )}
+                </label>
+
+                {/* 2. 蓄積された過去ログの選択 */}
+                <div className="flex items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                  <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 shrink-0 mr-2">
+                    <Calendar className="w-4 h-4 text-slate-400" /> 過去ログ:
+                  </span>
+                  <select
+                    value={selectedLogId}
+                    onChange={(e) => setSelectedLogId(e.target.value)}
+                    className="w-full bg-transparent text-xs font-mono font-bold text-slate-200 focus:outline-none cursor-pointer"
+                  >
+                    {logs.map(log => (
+                      <option key={log.id} value={log.id} className="bg-slate-900 text-slate-200">
+                        {log.date} のセッション
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 1: PROGRESSIVE OVERLOAD INDICATOR & RIR */}
+            <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4 backdrop-blur-md">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Activity className="w-4 h-4 text-cyan-400" /> プログレッシブ・オーバーロード判定
+                </span>
+                <span className="text-xs font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                  総負荷量: {latestVol.toLocaleString()} kg
+                </span>
+              </div>
+
+              {/* Overload Status Card */}
+              <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800/80 flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="text-sm font-extrabold text-slate-100 flex items-center gap-2 flex-wrap">
+                    {volChangePercent >= 0 ? (
+                      <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md text-xs font-mono">
+                        前回比 +{volChangePercent}%
+                      </span>
+                    ) : (
+                      <span className="text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md text-xs font-mono">
+                        前回比 {volChangePercent}%
+                      </span>
+                    )}
+                    <span>{volChangePercent >= 0 ? '適切な負荷アプローチ' : 'ディロード / 調整セッション'}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed mt-1">
+                    {volChangePercent >= 0 
+                      ? '✅ 筋肥大の主因である「総負荷量（メカニカルテンション）」が向上しています。関節への急激なストレス過多もなく安全域です。'
+                      : 'ℹ️ 前回セッションより全体の負荷量が抑えられています。疲労抜きまたは別部位のトレーニング日として正常です。'}
+                  </p>
+                </div>
+                <div className="bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20 flex-shrink-0">
+                  <ShieldCheck className="w-7 h-7 text-emerald-400" />
+                </div>
+              </div>
+
+              {/* RIR Reps in Reserve Slider */}
+              <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-medium text-slate-300 flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5 text-amber-400" /> 終了時の自覚的余力 (RIR):
+                  </span>
+                  <span className="font-bold font-mono text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded">
+                    {currentRir === 0 ? '限界 (0回)' : `あと ${currentRir} 回できた (RIR ${currentRir})`}
+                  </span>
+                </div>
+                
+                <input
+                  type="range"
+                  min="0"
+                  max="3"
+                  step="1"
+                  value={currentRir}
+                  onChange={(e) => setCurrentRir(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-red-500 outline-none"
+                />
+                
+                <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                  <span>RIR 0 (追い込み)</span>
+                  <span>RIR 1 (推奨: 筋肥大最適)</span>
+                  <span>RIR 2 (余力あり)</span>
+                  <span>RIR 3 (軽度)</span>
+                </div>
+              </div>
+            </section>
+
+            {/* SECTION 2: ESTIMATED 1RM GROWTH & FORECAST */}
+            <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                  <BarChart2 className="w-4 h-4 text-emerald-400" /> ベンチプレス 推定1RM 成長曲線
+                </span>
+                <span className="text-[11px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> 目標: 60kg
+                </span>
+              </div>
+
+              <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex justify-between text-xs text-slate-400 pb-2 border-b border-slate-800/80">
+                  <span>期間: 2026/08/01 〜 {latestLog?.date.replace(/-/g, '/')}</span>
+                  <span className="text-emerald-400 font-bold font-mono">
+                    ＋{(benchPressGrowth[benchPressGrowth.length - 1]?.rm - benchPressGrowth[0]?.rm || 0).toFixed(1)} kg 向上！
+                  </span>
+                </div>
+
+                {/* Growth Visual Bars */}
+                <div className="space-y-3 pt-1">
+                  {benchPressGrowth.map((item, idx) => {
+                    const maxRmVal = 60;
+                    const widthPercent = Math.min(Math.round((item.rm / maxRmVal) * 100), 100);
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex justify-between text-xs font-mono">
+                          <span className={item.isLatest ? "text-emerald-400 font-bold" : "text-slate-400"}>
+                            {item.date} {item.isLatest && "(選択中)"}
+                          </span>
+                          <span className={item.isLatest ? "text-emerald-400 font-bold" : "text-slate-300"}>
+                            推定1RM: {item.rm} kg ({item.details})
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              item.isLatest
+                                ? "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-lg shadow-emerald-500/50"
+                                : "bg-slate-500"
+                            }`}
+                            style={{ width: `${widthPercent}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* AI Target Prediction */}
+                  <div className="space-y-1 opacity-70 pt-1">
+                    <div className="flex justify-between text-xs font-mono">
+                      <span className="text-amber-400">09/15 (AI予測)</span>
+                      <span className="text-amber-400">60 kg (自重相当)</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-dashed border-amber-500/40">
+                      <div className="bg-amber-500/50 h-full rounded-full" style={{ width: '100%' }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* SECTION 3: RECOMMENDED WARMUP DRILLS */}
+            <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Zap className="w-4 h-4 text-amber-400" /> 本日の推奨ウォームアップ
+                </span>
+                
+                <div className="flex bg-slate-950 rounded-lg p-1 text-xs font-medium border border-slate-800">
+                  <button
+                    onClick={() => setTargetSplit('upper')}
+                    className={`px-3 py-1 rounded-md transition-all ${targetSplit === 'upper' ? 'bg-red-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    上半身の日
+                  </button>
+                  <button
+                    onClick={() => setTargetSplit('lower')}
+                    className={`px-3 py-1 rounded-md transition-all ${targetSplit === 'lower' ? 'bg-red-600 text-white font-bold shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    下半身の日
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800 text-sm space-y-3 text-slate-300">
+                {targetSplit === 'upper' ? (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <span className="bg-red-950 text-red-400 font-mono font-bold px-2 py-0.5 rounded text-xs mt-0.5 border border-red-800/40">1</span>
+                      <div className="text-xs leading-relaxed">
+                        <strong className="text-slate-100">胸椎ストレッチ（1分）：</strong> 背骨の胸椎アーチを作り、ベンチプレスのボトムで肩関節を守る。
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="bg-red-950 text-red-400 font-mono font-bold px-2 py-0.5 rounded text-xs mt-0.5 border border-red-800/40">2</span>
+                      <div className="text-xs leading-relaxed">
+                        <strong className="text-slate-100">肩甲骨下制ドリル（1分）：</strong> バーベルを押し切る際、肩がすくまないよう前鋸筋・下部僧帽筋を活性化。
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="bg-red-950 text-red-400 font-mono font-bold px-2 py-0.5 rounded text-xs mt-0.5 border border-red-800/40">3</span>
+                      <div className="text-xs leading-relaxed">
+                        <strong className="text-slate-100">トレッドミル歩き（5分）：</strong> 傾斜5%、時速5.5kmで滑液と関節温度を高める（走らない）。
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <span className="bg-red-950 text-red-400 font-mono font-bold px-2 py-0.5 rounded text-xs mt-0.5 border border-red-800/40">1</span>
+                      <div className="text-xs leading-relaxed">
+                        <strong className="text-slate-100">ヒップヒンジ（1分）：</strong> 股関節主導でお尻を引く感覚を呼び起こし、デッドリフトの腰痛を防止。
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="bg-red-950 text-red-400 font-mono font-bold px-2 py-0.5 rounded text-xs mt-0.5 border border-red-800/40">2</span>
+                      <div className="text-xs leading-relaxed">
+                        <strong className="text-slate-100">足首・アキレス腱モービル（1分）：</strong> スクワットのしゃがみ込みでかかとが浮かないよう可動域確保。
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+
+            {/* SECTION 4: WORKOUT LOG HISTORY */}
+            <section className="space-y-4 pt-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-400" /> 実績ログ詳細
+                </span>
+                <span className="text-xs bg-slate-900 px-3 py-1.5 rounded-xl text-slate-300 flex items-center gap-1.5 border border-slate-800 font-mono">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" /> {latestLog?.date}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {latestLog?.exercises?.map((ex, idx) => {
+                  const calculated1RM = getExerciseMax1RM(ex);
+                  return (
+                    <div key={idx} className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-lg space-y-3">
+                      <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                        <span className="font-bold text-sm text-slate-100">{ex.name}</span>
+                        {calculated1RM > 0 && (
+                          <span className="text-[11px] font-bold font-mono bg-red-950/90 text-red-400 border border-red-800/60 px-2 py-0.5 rounded-md tracking-wider">
+                            推定1RM: {calculated1RM}kg
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1.5 text-xs text-slate-400">
+                        {ex.sets?.map((s) => (
+                          <div 
+                            key={s.set_num} 
+                            className={`flex justify-between items-center px-3 py-1.5 rounded-lg ${s.is_max_rm ? 'bg-slate-800/80 border border-slate-700 text-slate-200' : 'bg-slate-950/60'}`}
+                          >
+                            <span className="text-slate-500 font-mono">{s.set_num} set</span>
+                            <span className={`font-mono ${s.is_max_rm ? 'text-emerald-400 font-bold' : 'text-slate-300'}`}>
+                              {s.weight_kg === 0 ? '自重' : `${s.weight_kg}kg`} × {s.reps} reps
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Cardio Card */}
+              {latestLog?.cardio && (
+                <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
+                      <Flame className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-sm text-slate-200">{latestLog.cardio.type}</span>
+                      <p className="text-[11px] text-slate-400">消費エネルギー: {latestLog.cardio.calories} kcal</p>
+                    </div>
+                  </div>
+                  <span className="text-slate-200 font-mono text-sm bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                    {latestLog.cardio.distance_km} km / {latestLog.cardio.duration_min} 分
+                  </span>
+                </div>
+              )}
+            </section>
+
+            {/* SECTION 5: PROMPT PREVIEW TOGGLE */}
+            <section className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 space-y-3">
+              <button
+                onClick={() => setShowPromptPreview(!showPromptPreview)}
+                className="w-full flex justify-between items-center text-xs font-bold text-slate-400 hover:text-slate-200 transition"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-red-400" /> 専属トレーナー送信テキストのプレビュー (過去全{logs.length}回ログ＋PR成果含む)
+                </span>
+                <ChevronRight className={`w-4 h-4 transition-transform ${showPromptPreview ? 'rotate-90' : ''}`} />
+              </button>
+
+              {showPromptPreview && (
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-all max-h-96 overflow-y-auto">
+                  {generateTrainerPrompt()}
+                </div>
+              )}
+            </section>
+
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<WorkoutDashboard />);
+  </script>
+</body>
+</html>
