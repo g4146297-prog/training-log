@@ -12,59 +12,15 @@
   <meta name="apple-mobile-web-app-title" content="筋トレLog">
   <meta name="description" content="科学的根拠に基づく筋肥大マネジメント & Web Share Target連動ダッシュボード">
 
-  <!-- External Libraries -->
+  <!-- Static Web App Manifest Link (Crucial for Android WebAPK Generation) -->
+  <link rel="manifest" href="./manifest.json">
+
+  <!-- External CDN Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Dynamic Web App Manifest Injection for Web Share Target API -->
-  <script>
-    (function() {
-      const manifest = {
-        "name": "専属トレーナー 筋トレLog PRO",
-        "short_name": "筋トレLog",
-        "description": "筋トレメモから直接ログを取り込めるプログレッシブ・オーバーロード管理アプリ",
-        "start_url": "./",
-        "display": "standalone",
-        "background_color": "#020617",
-        "theme_color": "#020617",
-        "icons": [
-          {
-            "src": "https://placehold.co/192x192/ef4444/ffffff?text=FIT",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any maskable"
-          },
-          {
-            "src": "https://placehold.co/512x512/ef4444/ffffff?text=FIT+PRO",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any maskable"
-          }
-        ],
-        "share_target": {
-          "action": "./",
-          "method": "GET",
-          "params": {
-            "title": "title",
-            "text": "text",
-            "url": "url"
-          }
-        }
-      };
-
-      const stringManifest = JSON.stringify(manifest);
-      const blob = new Blob([stringManifest], {type: 'application/json'});
-      const manifestUrl = URL.createObjectURL(blob);
-      
-      const link = document.createElement('link');
-      link.rel = 'manifest';
-      link.href = manifestUrl;
-      document.head.appendChild(link);
-    })();
-  </script>
 
   <style>
     body { 
@@ -95,11 +51,11 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-red-500 selection:text-white">
   <div id="root"></div>
 
-  <!-- React Application Logic -->
+  <!-- React Application Core Logic -->
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
 
-    // --- SVG Icon Components ---
+    // --- Inline SVG Icon Components ---
     const Dumbbell = ({ className = "w-6 h-6" }) => (
       <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M2 10.5v3M22 10.5v3M9 6.5v11M15 6.5v11" />
@@ -369,10 +325,21 @@
       const [isUploading, setIsUploading] = useState(false);
       const [uploadSuccess, setUploadSuccess] = useState(false);
 
-      // Web Share Target API：Android「共有」経由で受け取った共有データ
+      // Web Share Target API: Android共有経由で受け取ったデータ
       const [receivedShareData, setReceivedShareData] = useState(null);
 
-      // 1. Android共有メニュー（URLクエリパラメータ）からの着信データを監視・処理
+      // 1. Service Worker の登録
+      useEffect(() => {
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+              .then(reg => console.log('Service Worker Registered successfully:', reg.scope))
+              .catch(err => console.log('Service Worker Registration failed:', err));
+          });
+        }
+      }, []);
+
+      // 2. Android共有メニュー（URLクエリパラメータ）からの着信データを監視・処理
       useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const sharedText = urlParams.get('text') || urlParams.get('title') || urlParams.get('url');
@@ -383,15 +350,15 @@
             timestamp: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
           });
 
-          // 新しいログとしてデータに仮追加する演出
+          // 共有受け取りデータを最新ログとして動的に仮追加する
           const todayStr = new Date().toISOString().split('T')[0];
           const sharedLog = {
             id: 'log_' + Date.now(),
-            date: `${todayStr} (共有連携)`,
+            date: `${todayStr} (共有受信)`,
             rir: 1,
             exercises: [
               {
-                name: '共有取得: ' + (sharedText.length > 15 ? sharedText.substring(0, 15) + '...' : sharedText),
+                name: '筋トレMEMO連動: ' + (sharedText.length > 18 ? sharedText.substring(0, 18) + '...' : sharedText),
                 sets: [
                   { set_num: 1, weight_kg: 40, reps: 10, is_max_rm: true },
                   { set_num: 2, weight_kg: 40, reps: 10, is_max_rm: true },
@@ -403,27 +370,8 @@
           setLogs(prev => [sharedLog, ...prev]);
           setSelectedLogId(sharedLog.id);
 
-          // URLパラメータをクリアして履歴を綺麗に保つ
+          // URLパラメータをクリアしてブラウザ履歴を整理
           window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      }, []);
-
-      // Service Worker 登録 (PWAの共有受取用)
-      useEffect(() => {
-        if ('serviceWorker' in navigator) {
-          const swCode = `
-            self.addEventListener('install', (e) => self.skipWaiting());
-            self.addEventListener('activate', (e) => self.clients.claim());
-            self.addEventListener('fetch', (e) => {
-              // ネットワークリクエストをそのまま通す
-            });
-          `;
-          const blob = new Blob([swCode], { type: 'application/javascript' });
-          const swUrl = URL.createObjectURL(blob);
-          
-          navigator.serviceWorker.register(swUrl).catch(err => {
-            console.log('SW Registration skipped or restricted:', err);
-          });
         }
       }, []);
 
@@ -924,7 +872,7 @@
               )}
             </section>
 
-            {/* SECTION 5: PROMPT PREVIEW TOGGLE (全履歴過去ログ全網羅) */}
+            {/* SECTION 5: PROMPT PREVIEW TOGGLE */}
             <section className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 space-y-3">
               <button
                 onClick={() => setShowPromptPreview(!showPromptPreview)}
