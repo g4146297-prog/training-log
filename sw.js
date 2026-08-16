@@ -29,7 +29,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // キャッシュがあればキャッシュから返し、無ければネットワークリクエストを行う
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
